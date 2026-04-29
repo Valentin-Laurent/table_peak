@@ -36,3 +36,10 @@ files = ["src", "tests"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-ra --tb=short"
+
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = ["src"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
