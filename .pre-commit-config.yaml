@@ -11,4 +11,4 @@ repos:
       - id: mypy
         files: ^(src|tests)/
         args: [--strict]
-        additional_dependencies: []
+        additional_dependencies: ["pytest>=8.0"]
