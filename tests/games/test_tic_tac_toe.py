@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+
 from table_peak.games.tic_tac_toe import TicTacToe
 
 
