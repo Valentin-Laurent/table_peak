@@ -129,6 +129,7 @@ def test_move_when_terminal_rejected(client: TestClient) -> None:
     # Any cell now -> 409.
     r = client.post(f"/games/{game_id}/move", data={"cell": "0"})
     assert r.status_code == 409
+    assert r.json()["detail"] == "Game is over"
 
 
 def test_move_when_not_humans_turn_rejected(client: TestClient) -> None:
@@ -137,9 +138,11 @@ def test_move_when_not_humans_turn_rejected(client: TestClient) -> None:
     # Don't trigger GET — state is still initial (non-terminal), current bot.
     r = client.post(f"/games/{game_id}/move", data={"cell": "0"})
     assert r.status_code == 409
+    assert r.json()["detail"] == "Not your turn"
 
 
 def test_move_on_unknown_game_returns_404(client: TestClient) -> None:
+    """POSTing a move to a game id that doesn't exist returns 404."""
     r = client.post("/games/nonexistent/move", data={"cell": "0"})
     assert r.status_code == 404
 
