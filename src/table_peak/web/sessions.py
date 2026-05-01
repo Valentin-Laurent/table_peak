@@ -22,6 +22,9 @@ class GameSession:
 
     `agents[seat] is None` means a human plays that seat. The web adapter
     applies human actions to `state` directly; bots are called via `Agent.act`.
+
+    Mutable by design: `advance_bots` and the web layer replace `state` after
+    each bot move; the `agents` dict is unchanged after construction.
     """
 
     state: TicTacToeState
