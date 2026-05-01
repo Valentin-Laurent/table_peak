@@ -77,3 +77,28 @@ def game_page(
     store.save(game_id, session)
     view = render(session.state, session.agents, game_id)
     return templates.TemplateResponse(request, "game.html", {"view": view})
+
+
+@app.post("/games/{game_id}/move", response_class=HTMLResponse)
+def submit_move(
+    game_id: str,
+    request: Request,
+    cell: Annotated[int, Form()],
+    store: Annotated[InMemorySessionStore, Depends(get_store)],
+) -> HTMLResponse:
+    session = store.get(game_id)
+    if session is None:
+        raise HTTPException(status_code=404)
+    if session.state.is_terminal:
+        raise HTTPException(status_code=409, detail="Game is over")
+    if session.agents[session.state.current_player] is not None:
+        raise HTTPException(status_code=409, detail="Not your turn")
+    if cell not in session.state.legal_actions():
+        raise HTTPException(status_code=400, detail=f"Illegal action: {cell}")
+    session.state = session.state.apply_action(cell)
+    advance_bots(session)
+    # advance_bots may have replaced session.state; persist via the store API
+    # so a future non-in-memory backend can hook in here.
+    store.save(game_id, session)
+    view = render(session.state, session.agents, game_id)
+    return templates.TemplateResponse(request, "_board.html", {"view": view})
