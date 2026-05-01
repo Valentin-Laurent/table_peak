@@ -78,24 +78,27 @@ HTMX is loaded from a CDN `<script>` tag — no Python dep, no bundling.
 src/table_peak/web/
 ├── __init__.py
 ├── app.py              # FastAPI app + route handlers
-├── sessions.py         # GameSession dataclass + InMemorySessionStore
+├── sessions.py         # GameSession dataclass + InMemorySessionStore + advance_bots
 ├── agents.py           # AGENT_REGISTRY: name → Agent factory
 ├── renderers/
 │   ├── __init__.py
-│   └── tic_tac_toe.py  # state → template context (cells, status, whose turn)
-├── templates/
-│   ├── new_game.html
-│   ├── game.html
-│   └── _board.html
-└── static/
-    └── style.css
+│   └── tic_tac_toe.py  # state → BoardView (cells, status, cells_clickable, game_id)
+└── templates/
+    ├── new_game.html
+    ├── game.html
+    └── _board.html
 
 tests/web/
 ├── __init__.py
-└── test_app.py
+├── test_sessions.py    # GameSession + store + advance_bots (8 tests)
+├── test_agents.py      # AGENT_REGISTRY (4 tests)
+├── test_renderer.py    # render() (7 tests)
+└── test_app.py         # routes via FastAPI TestClient (12 tests)
 ```
 
 `renderers/` is a dispatch point for future games. For v1 it has only `tic_tac_toe.py`. When Skyjo arrives, it gets a sibling module; no changes required to `app.py` beyond mounting another route group.
+
+CSS is inlined in `new_game.html` and `game.html` for v1 — no `static/` mount, no `StaticFiles` dependency. If styling grows beyond a handful of selectors, extract to `static/style.css` and mount via `StaticFiles`.
 
 ## Data flow
 
@@ -144,7 +147,9 @@ Two `<select>` elements (X agent, O agent), values `Human`, `Random`, `Minimax`.
 
 ### `game.html`
 
-Wraps `_board.html` plus a status line and a "New game" link. Because every render runs `advance_bots` first, the only non-terminal page a user ever sees has the human as `current_player`. So the status line is one of: `Your turn (X)` / `Your turn (O)` / `Game over — you won` / `Game over — you lost` / `Game over — draw` / `Game over` (for spectated bot-vs-bot).
+Wraps `_board.html` plus a status line and a "New game" link. Because every render runs `advance_bots` first, the only non-terminal page a user ever sees has the human as `current_player`. So the status line is one of: `Your turn (X)` / `Your turn (O)` / `Game over — X won` / `Game over — O won` / `Game over — draw`.
+
+The status text is intentionally neutral (no "you won" / "you lost") because Human-vs-Human hot-seat games are allowed and the bot-vs-bot spectator mode has no "you" — saying "X won" works for all three modes.
 
 ### `_board.html`
 
@@ -189,9 +194,9 @@ Test type: **macro-fake**. FastAPI `TestClient` is the fake (in-process, no real
 | `test_move_when_not_humans_turn_rejected` | Random vs Random, then `POST /move` | 409 |
 | `test_unknown_game_id_returns_404` | `GET /games/nonexistent` | 404 |
 
-Tests seed agents where determinism matters (Random gets a seeded RNG) so assertions are stable.
+Tests in `test_app.py` rely on substring assertions ("Game over", "Your turn (X)") that hold regardless of which legal move `RandomAgent` picks; explicit RNG seeding is unnecessary. `MinimaxAgent` is deterministic by design.
 
-No micro-tests on individual route helpers, on `advance_bots`, or on templates. The TestClient layer gives the right granularity.
+The route-level tests are complemented by direct black-box tests on the supporting modules — `test_sessions.py` for the `advance_bots` invariants (no-op when terminal, no-op when human to move, runs to terminal when no humans), `test_agents.py` for the registry contract, and `test_renderer.py` for the `state → BoardView` mapping. These are still macro-fake (real domain types, no mocks) and cover contracts that the TestClient layer would only exercise indirectly.
 
 ## Mypy & ruff
 
