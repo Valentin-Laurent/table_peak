@@ -22,7 +22,7 @@ def client() -> Iterator[TestClient]:
     app.dependency_overrides[get_store] = lambda: store
     with TestClient(app) as c:
         yield c
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(get_store, None)
 
 
 def test_new_game_page_renders(client: TestClient) -> None:

@@ -72,6 +72,8 @@ def game_page(
     if session is None:
         raise HTTPException(status_code=404)
     advance_bots(session)
+    # advance_bots may have replaced session.state; persist via the store API
+    # so a future non-in-memory backend can hook in here.
     store.save(game_id, session)
     view = render(session.state, session.agents, game_id)
     return templates.TemplateResponse(request, "game.html", {"view": view})
