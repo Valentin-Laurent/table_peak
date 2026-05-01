@@ -31,10 +31,10 @@ def render(
 
     if state.is_terminal:
         returns = state.returns()
-        if returns[0] == returns[1] == 0.0:
+        winner: PlayerId | None = next((pid for pid, r in returns.items() if r > 0), None)
+        if winner is None:
             status = "Game over — draw"
         else:
-            winner: PlayerId = 0 if returns[0] > returns[1] else 1
             status = f"Game over — {'X' if winner == 0 else 'O'} won"
         clickable = False
     else:

@@ -63,6 +63,20 @@ def test_draw_terminal_status() -> None:
     assert view.status == "Game over — draw"
 
 
+def test_cells_not_clickable_when_bot_to_move() -> None:
+    """If current player's seat is a bot, cells should not be clickable.
+
+    In the production flow advance_bots prevents this state from being
+    rendered, but render() is a pure function and must produce a correct
+    view if called directly.
+    """
+    state = TicTacToe().new_initial_state()
+    agents: dict[PlayerId, Agent | None] = {0: MinimaxAgent(), 1: None}
+    view = render(state, agents=agents, game_id="g")
+    assert view.is_terminal is False
+    assert view.cells_clickable is False
+
+
 def test_cells_use_x_o_and_blank_marks() -> None:
     state = _state_from_moves([0, 4])  # X at 0, O at 4
     agents: dict[PlayerId, Agent | None] = {0: None, 1: None}
