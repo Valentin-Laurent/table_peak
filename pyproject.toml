@@ -3,7 +3,11 @@ name = "table-peak"
 version = "0.1.0"
 description = "Game-playing agents for tabletop games."
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+]
 
 [dependency-groups]
 dev = [
@@ -11,6 +15,7 @@ dev = [
     "mypy>=1.8",
     "ruff>=0.4",
     "pre-commit>=3.6",
+    "httpx>=0.27",
 ]
 
 [build-system]
