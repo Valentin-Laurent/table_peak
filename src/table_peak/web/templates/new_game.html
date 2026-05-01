@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>table_peak — New Game</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
+        label { display: block; margin: 0.5rem 0; }
+        select, button { font-size: 1rem; padding: 0.25rem 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>New Game</h1>
+    <form action="/games" method="post">
+        <label>
+            X (first to move):
+            <select name="x_agent">
+                <option value="Human" selected>Human</option>
+                <option value="Random">Random</option>
+                <option value="Minimax">Minimax</option>
+            </select>
+        </label>
+        <label>
+            O:
+            <select name="o_agent">
+                <option value="Human">Human</option>
+                <option value="Random">Random</option>
+                <option value="Minimax" selected>Minimax</option>
+            </select>
+        </label>
+        <button type="submit">Start</button>
+    </form>
+</body>
+</html>

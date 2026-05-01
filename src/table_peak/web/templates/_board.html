@@ -1,0 +1,19 @@
+<div id="board">
+    <p class="status">{{ view.status }}</p>
+    <div class="grid">
+        {% for cell in view.cells %}
+            {% set idx = loop.index0 %}
+            {% if cell %}
+                <span class="cell mark">{{ cell }}</span>
+            {% elif view.cells_clickable %}
+                <form hx-post="/games/{{ view.game_id }}/move"
+                      hx-target="#board" hx-swap="outerHTML"
+                      class="cell">
+                    <button type="submit" name="cell" value="{{ idx }}">·</button>
+                </form>
+            {% else %}
+                <span class="cell empty">·</span>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>
