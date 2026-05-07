@@ -1,7 +1,7 @@
 # TTT Training (v2) — Design
 
 **Date:** 2026-05-04
-**Status:** Draft, awaiting user review
+**Status:** Shipped (with mid-implementation amendment, see "Algorithm" → "Self-play recipe")
 
 ## Goal
 
@@ -78,6 +78,8 @@ A Protocol so future games (Skyjo, etc.) can ship their own encoder without touc
 
 Provides the opponent agent for a given training game. Default `SelfOpponentSampler` returns the currently-training agent (pure self-play). The Protocol is the seam for future opponent mixing (random + self curriculum) and eventually PSRO meta-strategy sampling.
 
+**Note:** the v2 `train()` loop does not use `SelfOpponentSampler` exclusively — see "Self-play recipe" below for the mixed-opponent strategy that was needed to converge.
+
 ### `CheckpointStore` (in `training/checkpoint.py`)
 
 Save/load the full training state (net weights + optimizer state + step counter + hparams snapshot), keyed by generation index. `FileCheckpointStore` writes `gen_NNNN.pt` files. The hparams snapshot allows mismatch detection on resume.
@@ -88,7 +90,7 @@ Append a row per `log(step, **fields)` call. `CSVMetricsLogger` writes a CSV; `p
 
 ### `HParams` (frozen dataclass in `training/loop.py`)
 
-Plain frozen dataclass: `games_per_update`, `total_updates`, `lr`, `entropy_coef`, `value_coef`, `train_temperature`, `eval_every`, `checkpoint_every`, `seed`. Defaults tuned for the <5-min smoke-test budget.
+Plain frozen dataclass: `games_per_update`, `total_updates`, `lr`, `entropy_coef`, `value_coef`, `train_temperature`, `random_opponent_fraction`, `eval_every`, `eval_n_per_pair`, `checkpoint_every`, `seed`. Defaults tuned for the <5-min smoke-test budget.
 
 ## Algorithm: REINFORCE with value baseline
 
@@ -142,6 +144,18 @@ The orchestration in `loop.train(...)`:
 - **Dedicated training-side episode generator** in `training/self_play.py`, rather than retrofitting `runner.play_game`. The trainer needs per-player sample/return capture; `play_game` returns an aggregate `Outcome`. Keeping the training loop's needs out of `runner/` preserves its reusability.
 - **Trajectory buffer is on-policy and cleared after every update.** No reservoir, no replay. The eventual NFSP swap will introduce a separate buffer abstraction; making this one polymorphic now would over-fit the design.
 - **Encoding happens at batch construction time**, not per-sample during play. Cleaner CPU/tensor boundary, single conversion site.
+
+### Self-play recipe (post-implementation amendment)
+
+The original plan called for pure self-play via `SelfOpponentSampler`. During implementation, that recipe plateaued at ~70% non-loss vs Random across 1000–10000 updates: gradient updates from symmetric self-games provided no stable signal, so the policy oscillated rather than converging. To meet success criterion 1 within the 5-min budget, three orthogonal changes were folded directly into `train()`:
+
+1. **Mixed opponents (`random_opponent_fraction = 0.7`).** 70 % of training games use a fresh `RandomAgent` opponent instead of the self-play sampler. This breaks the self-play cycle without the cost of maintaining a population.
+2. **Side alternation.** Per game, the trained agent is randomly assigned to P0 or P1 (50/50). Without this, training is biased toward one seat while evaluation uses `swap_sides=True`.
+3. **Filtered buffer when opponent is non-neural.** When the opponent is a `RandomAgent`, only the trained agent's own (state, action, return) samples enter the buffer — the random opponent's actions did not come from the policy under training, so attributing the terminal return to them adds pure noise.
+
+These live inline in `train()` rather than behind a new Port. They are TTT-specific learning-stability fixes; if a future game needs the same pattern, the right move is to extract a `RandomMixingSampler` adapter at that point. Today, YAGNI.
+
+`SelfOpponentSampler` and the `OpponentSampler` Protocol remain in `training/self_play.py` — the seam is correct, even though the v2 default loop reaches around it for the random-opponent fraction. The PSRO eventual replacement will use the Port for meta-strategy sampling and almost certainly drop the inline mixing.
 
 ## Eval (`eval.py`)
 
@@ -203,5 +217,5 @@ These re-enter the design when concrete need shows up:
 
 ## Open questions / risks
 
-- **REINFORCE convergence on TTT in <5 min CPU.** Not certain — depends on hparams. Mitigation: tune `total_updates` and `games_per_update` defaults first; only reach for algorithm changes if those don't close the gap.
+- **REINFORCE convergence on TTT in <5 min CPU.** Resolved — pure self-play did not close the gap; the inline mixed-opponent + side-alternation + filtered-buffer recipe documented under "Self-play recipe" did, in ~62 s wall time on CPU.
 - **PSRO transition cost.** The three Port Protocols (`OpponentSampler`, `CheckpointStore`, `MetricsLogger`) are designed to make the eventual PSRO leap mechanical (population manager + Nash solver + per-generation snapshots). Validated only at design time; the actual transition will exercise it.
