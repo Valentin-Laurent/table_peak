@@ -25,4 +25,17 @@ Each entry below describes a feature currently being developed in parallel with 
 
 ## Entries
 
-(none)
+- name: training-progress-viewer
+  spec_path: docs/superpowers/specs/2026-05-10-training-progress-viewer-design.md
+  branch: feature/training-progress-viewer
+  worktree_path: TBD
+  status: spec_drafted
+  scope_summary: Terminal-rendered live training-metrics viewer (plotext) backed by a `RunStore` Port + filesystem run-dir convention; web/notebook adapters deferred.
+  forbidden_zones:
+    - src/table_peak/training/run.py
+    - src/table_peak/training/viz.py
+    - src/table_peak/training/train.py
+    - tests/training/test_run.py
+    - tests/training/test_viz.py
+    - tests/training/test_train.py
+    - runs/**
