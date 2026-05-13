@@ -37,7 +37,7 @@ The deck contains **150 cards**:
 2. Deal **12 cards face-down** to each player, arranged in a **4-column × 3-row** grid. Players may not look at them.
 3. Place the rest of the deck face-down as the **draw pile**; flip its top card to start the **discard pile**.
 4. Each player chooses **exactly 2** of their 12 grid cards (free position) and flips them face-up simultaneously.
-5. **Starting player:** highest sum of the two revealed cards; tied players each reveal one tiebreak card from the draw pile, with the highest revealed value starting. If that tiebreak draw is still tied, only the still-tied players repeat this draw-until-broken procedure, discarding each revealed tiebreak card afterward. `[CHOSEN]` Magilano specifies the highest sum but not the tiebreak procedure — chose draw-based resolution rather than RNG.
+5. **Starting player:** highest sum of the two revealed cards; tied players each reveal one tiebreak card from the draw pile, discard those tiebreak cards, and the highest revealed value starts. If that tiebreak draw is still tied, only the still-tied players repeat this draw-until-broken procedure. `[CHOSEN]` Magilano specifies the highest sum but not the tiebreak procedure — chose draw-based resolution rather than RNG.
 6. Play proceeds clockwise.
 
 ## Turn structure
@@ -93,7 +93,7 @@ Round scores add to each player's cumulative total.
 
 - The game ends at the conclusion of the round in which **at least one player's cumulative score reaches or exceeds 100**.
 - Lowest cumulative score wins.
-- **Tie at game end:** tied lowest-score players each reveal one tiebreak card from the draw pile; the **lowest** revealed value wins. If that tiebreak draw is still tied, only the still-tied players repeat the draw-until-broken procedure, discarding each revealed tiebreak card afterward. `[CHOSEN]` Magilano does not specify — chose draw-based resolution rather than a shared win or RNG.
+- **Tie at game end:** tied lowest-score players each reveal one tiebreak card from the draw pile, discard those tiebreak cards, and the **lowest** revealed value wins. If that tiebreak draw is still tied, only the still-tied players repeat the draw-until-broken procedure. `[CHOSEN]` Magilano does not specify — chose draw-based resolution rather than a shared win or RNG.
 - Reaching exactly 100 ends the game (threshold is "≥ 100").
 
 ## Edge cases & ambiguities
