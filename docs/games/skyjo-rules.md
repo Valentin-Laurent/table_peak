@@ -60,7 +60,7 @@ Then check column elimination (next section) and play passes clockwise.
 
 ## Column elimination rule
 
-When all three cards in any column are simultaneously face-up **and have identical value**, the entire column (3 cards) is removed and placed on the discard. If the qualifying action replaced a grid card, that replaced card is discarded first as part of the action resolution, then the three identical cards are discarded on top of it. If no card was replaced, discard the three identical cards directly. Because the eliminated cards are identical, their internal order is irrelevant. `[CHOSEN]` This makes the discard sequence explicit without introducing an RNG-dependent ordering.
+When all three cards in any column are simultaneously face-up **and have identical value**, the entire column (3 cards) is removed and placed on the discard. If the qualifying action replaced a grid card, that replaced card is discarded first as part of the action resolution, then the three identical cards are discarded on top of it. If no card was replaced, discard the three identical cards directly. The only load-bearing ordering is that any replaced card stays below the eliminated trio; the order within that trio is irrelevant because all three values match. `[CHOSEN]` This makes the discard sequence explicit without introducing an RNG-dependent ordering.
 
 **Timing:**
 - Check at the **end** of the active player's turn, after the action fully resolves, before passing.
