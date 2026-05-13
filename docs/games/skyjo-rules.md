@@ -37,7 +37,7 @@ The deck contains **150 cards**:
 2. Deal **12 cards face-down** to each player, arranged in a **4-column × 3-row** grid. Players may not look at them.
 3. Place the rest of the deck face-down as the **draw pile**; flip its top card to start the **discard pile**.
 4. Each player chooses **exactly 2** of their 12 grid cards (free position) and flips them face-up simultaneously.
-5. **Starting player:** highest sum of the two revealed cards; ties broken by a fixed-RNG draw among the tied players. `[CHOSEN]` Magilano specifies the highest sum but not a deterministic tiebreaker — chose RNG-among-tied-players for fairness and reproducibility (a single seed gives deterministic test outcomes).
+5. **Starting player:** highest sum of the two revealed cards; tied players each reveal one tiebreak card from the draw pile, with the highest revealed value starting. If that tiebreak draw is still tied, only the still-tied players repeat this draw-until-broken procedure, discarding each revealed tiebreak card afterward. `[CHOSEN]` Magilano specifies the highest sum but not the tiebreak procedure — chose draw-based resolution rather than RNG.
 6. Play proceeds clockwise.
 
 ## Turn structure
@@ -53,14 +53,14 @@ On their turn, the active player picks exactly one of two mutually exclusive bra
 1. Draw the top card and look at it (value is private to the active player at this instant).
 2. Choose one sub-action:
    - **(b1) Replace:** swap the drawn card with exactly one grid card (face-up or face-down). New card goes face-up into the slot; replaced card goes face-up to the discard.
-   - **(b2) Discard-and-flip:** place the drawn card face-up on the discard, then flip exactly one **face-down** grid card face-up. **Legal only if the player has ≥1 face-down card.** `[CHOSEN]` Magilano does not explicitly forbid (b2) with no face-down cards remaining, but the action description requires a flip — chose the standard reading: (b2) is illegal when `F = 0` (the player must use (b1) instead).
+   - **(b2) Discard-and-flip:** place the drawn card face-up on the discard, then flip exactly one **face-down** grid card face-up.
 3. After resolution, the drawn card is public regardless of branch.
 
 Then check column elimination (next section) and play passes clockwise.
 
 ## Column elimination rule
 
-When all three cards in any column are simultaneously face-up **and have identical value**, the entire column (3 cards) is removed and placed on the discard, with the just-completed (most recently flipped or placed) card on top. `[CHOSEN]` Magilano does not specify ordering — chose "most-recently-revealed on top" because it preserves a sensible causal chain in the discard history.
+When all three cards in any column are simultaneously face-up **and have identical value**, the entire column (3 cards) is removed and placed on the discard. If the qualifying action replaced a grid card, that replaced card is discarded first as part of the action resolution, then the three identical cards are discarded on top of it. If no card was replaced, discard the three identical cards directly. Because the eliminated cards are identical, their internal order is irrelevant. `[CHOSEN]` This makes the discard sequence explicit without introducing an RNG-dependent ordering.
 
 **Timing:**
 - Check at the **end** of the active player's turn, after the action fully resolves, before passing.
@@ -93,7 +93,7 @@ Round scores add to each player's cumulative total.
 
 - The game ends at the conclusion of the round in which **at least one player's cumulative score reaches or exceeds 100**.
 - Lowest cumulative score wins.
-- **Tie at game end:** **shared win** (no tiebreaker round). `[CHOSEN]` Magilano does not specify — chose shared win because it matches the published "lowest cumulative score wins" rule directly with no extra mechanics; the framework can model multi-winner outcomes via the per-player returns dict.
+- **Tie at game end:** tied lowest-score players each reveal one tiebreak card from the draw pile; the **lowest** revealed value wins. If that tiebreak draw is still tied, only the still-tied players repeat the draw-until-broken procedure, discarding each revealed tiebreak card afterward. `[CHOSEN]` Magilano does not specify — chose draw-based resolution rather than a shared win or RNG.
 - Reaching exactly 100 ends the game (threshold is "≥ 100").
 
 ## Edge cases & ambiguities
@@ -102,9 +102,8 @@ Round scores add to each player's cumulative total.
 - **Column elimination triggering round-end.** If a flip/replacement completes a column of three identical face-up cards, the column is eliminated; if this leaves the player with zero face-down cards, round-end triggers. Trigger is checked **after** elimination resolves.
 - **Multiple players reaching 0 face-down on the same turn.** Only the active player acts per turn, so this cannot happen on a single action. During the final-turns phase, a non-ender may also reach 0 face-down via their action; this does **not** retrigger or extend round-end. The round ends after each non-ender has taken exactly one final turn.
 - **Multi-way ties at round end.** The round-ender's penalty applies if any non-ender ties them at lowest score. Ties among non-enders do not affect anyone's penalty.
-- **Tie at exactly 100 ending the game.** If multiple players cross 100 in the same round, the game still ends after that round; ranking is by cumulative score (with tiebreaker policy above).
+- **Tie at exactly 100 ending the game.** If multiple players cross 100 in the same round, the game still ends after that round; ranking is by cumulative score, with the draw-based game-end tiebreak above if needed.
 - **Replacing a face-up card with an identical value.** Legal. Replaced card goes to discard; new card occupies the slot face-up. Column elimination is re-checked.
-- **All face-up at start of own turn.** Impossible — would have triggered round-end on the previous turn.
 
 ## Information structure (for RL modelling)
 
