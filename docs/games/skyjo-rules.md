@@ -37,7 +37,7 @@ The deck contains **150 cards**:
 2. Deal **12 cards face-down** to each player, arranged in a **4-column × 3-row** grid. Players may not look at them.
 3. Place the rest of the deck face-down as the **draw pile**; flip its top card to start the **discard pile**.
 4. Each player chooses **exactly 2** of their 12 grid cards (free position) and flips them face-up simultaneously.
-5. **Starting player:** highest sum of the two revealed cards; tied players each reveal one tiebreak card from the draw pile, place those tiebreak cards onto the discard pile, and the highest revealed value starts. If that tiebreak draw is still tied, only the still-tied players repeat this draw-until-broken procedure; if the draw pile runs out, keep the current discard top aside, reshuffle the rest into a new draw pile, then restore the kept top. `[CHOSEN]` Magilano specifies the highest sum but not the tiebreak procedure — chose draw-based resolution rather than RNG.
+5. **Starting player:** highest sum of the two revealed cards; tied players each reveal one tiebreak card from the draw pile, place those tiebreak cards onto the discard pile, and the highest revealed value starts. If that tiebreak draw is still tied, only the still-tied players repeat this draw-until-broken procedure; if the draw pile runs out, keep the current discard top aside, reshuffle the rest into a new draw pile, then restore the kept top. `[CHOSEN]` Magilano specifies the highest sum but not the tiebreak procedure — chose draw-based resolution.
 6. Play proceeds clockwise.
 
 ## Turn structure
@@ -60,7 +60,7 @@ Then check column elimination (next section) and play passes clockwise.
 
 ## Column elimination rule
 
-When all three cards in any column are simultaneously face-up **and have identical value**, the entire column (3 cards) is removed and placed on the discard. If the qualifying action replaced a grid card, that replaced card is discarded first as part of the action resolution, then the three identical cards are discarded on top of it. If no card was replaced, discard the three identical cards directly. The only load-bearing ordering is that any replaced card stays below the eliminated trio; the order within that trio is irrelevant because all three values match. `[CHOSEN]` This makes the discard sequence explicit without introducing an RNG-dependent ordering.
+When all three cards in any column are simultaneously face-up **and have identical value**, the entire column (3 cards) is removed and placed on the discard. If the qualifying action replaced a grid card, that replaced card is discarded first as part of the action resolution, then the three identical cards are discarded on top of it. If no card was replaced, discard the three identical cards directly. The only load-bearing ordering is that any replaced card stays below the eliminated trio; the order within that trio is irrelevant because all three values match. `[CHOSEN]` This makes the discard sequence explicit without introducing any extra tie-breaking convention.
 
 **Timing:**
 - Check at the **end** of the active player's turn, after the action fully resolves, before passing.
@@ -93,7 +93,7 @@ Round scores add to each player's cumulative total.
 
 - The game ends at the conclusion of the round in which **at least one player's cumulative score reaches or exceeds 100**.
 - Lowest cumulative score wins.
-- **Tie at game end:** tied lowest-score players each reveal one tiebreak card from the draw pile, place those tiebreak cards onto the discard pile, and the **lowest** revealed value wins. If that tiebreak draw is still tied, only the still-tied players repeat the draw-until-broken procedure; if the draw pile runs out, keep the current discard top aside, reshuffle the rest into a new draw pile, then restore the kept top. `[CHOSEN]` Magilano does not specify — chose draw-based resolution rather than a shared win or RNG.
+- **Tie at game end:** tied lowest-score players each reveal one tiebreak card from the draw pile, place those tiebreak cards onto the discard pile, and the **lowest** revealed value wins. If that tiebreak draw is still tied, only the still-tied players repeat the draw-until-broken procedure; if the draw pile runs out, keep the current discard top aside, reshuffle the rest into a new draw pile, then restore the kept top. `[CHOSEN]` Magilano does not specify — chose draw-based resolution instead of a shared win.
 - Reaching exactly 100 ends the game (threshold is "≥ 100").
 
 ## Edge cases & ambiguities
