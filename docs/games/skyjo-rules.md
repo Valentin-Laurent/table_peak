@@ -84,7 +84,7 @@ At round end, all face-down cards (if any remain after elimination) are flipped 
 - **Round-ender penalty:** if the round-ender's score is **not strictly the lowest**, their round score is **doubled**.
   - Strictly lower than every other player → no penalty.
   - Any other player ≤ round-ender → doubled.
-- A round-ender with a zero or negative score is **still doubled** if not strictly lowest. Doubling a negative makes it more negative (better for the round-ender). `[CHOSEN]` Some house rules cap doubling at zero; the published rule does not — chose literal doubling (matches the published rule).
+- A round-ender with a zero or negative score is **still doubled** if not strictly lowest. Doubling a negative makes it more negative (better for the round-ender), so cap doubling at zero.
 - **Tie at lowest:** a tie at lowest **does** trigger doubling. `[CHOSEN]` The rulebook says the round-ender must "alone" have the lowest and BGG threads diverge — chose the strict literal reading (doubling triggers on tie).
 
 Round scores add to each player's cumulative total.
@@ -102,7 +102,7 @@ Round scores add to each player's cumulative total.
 - **Column elimination triggering round-end.** If a flip/replacement completes a column of three identical face-up cards, the column is eliminated; if this leaves the player with zero face-down cards, round-end triggers. Trigger is checked **after** elimination resolves.
 - **Multiple players reaching 0 face-down on the same turn.** Only the active player acts per turn, so this cannot happen on a single action. During the final-turns phase, a non-ender may also reach 0 face-down via their action; this does **not** retrigger or extend round-end. The round ends after each non-ender has taken exactly one final turn.
 - **Multi-way ties at round end.** The round-ender's penalty applies if any non-ender ties them at lowest score. Ties among non-enders do not affect anyone's penalty.
-- **Tie at exactly 100 ending the game.** If multiple players cross 100 in the same round, the game still ends after that round; ranking is by cumulative score, with the draw-based game-end tiebreak above if needed.
+- **Tie at exactly 100 ending the game.** `[CHOSEN]` If multiple players cross 100 in the same round, the game still ends after that round; ranking is by cumulative score, with the draw-based game-end tiebreak above if needed.
 - **Replacing a face-up card with an identical value.** Legal. Replaced card goes to discard; new card occupies the slot face-up. Column elimination is re-checked.
 
 ## Information structure (for RL modelling)
