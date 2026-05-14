@@ -12,6 +12,9 @@ __pycache__/
 .venv/
 venv/
 
+# pdm: machine-local interpreter pin (the lockfile pdm.lock IS committed)
+.pdm-python
+
 # Build artifacts
 build/
 dist/
@@ -26,6 +29,9 @@ dist/
 
 # OS
 .DS_Store
+
+# Training run artifacts (created by table_peak.training.run.Run)
+runs/
 
 # Git worktrees (used for subagent-driven-development)
 .worktrees/

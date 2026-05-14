@@ -55,7 +55,7 @@ The rules say "simultaneously," but `GameType.dynamics = SEQUENTIAL` is the clea
 1. **Deal phase** — chance nodes deal 12·num_players cards from the shuffled 150-card deck into per-player 4×3 grids (face-down for everyone).
 2. **Setup-commit phase** — sequential decision nodes in fixed convention order (player 0, 1, …, num_players−1). Each player picks an unordered position pair `(i, j)` with `i ≠ j` from their 12 face-down slots. **The committed pair enters that player's own information state but does NOT enter other players' information states.**
 3. **Synchronous reveal** — after the last player commits, a deterministic state transition exposes all 2·num_players chosen card values to public knowledge in one step (no per-card chance node, since the values were already determined by the deal).
-4. **Starting player determination** — highest sum-of-two among revealed pairs; ties broken by a fixed-RNG draw among the tied players (deterministic given the game seed). This matches the rules-doc `[CHOSEN]` policy.
+4. **Starting player determination** — highest sum-of-two among revealed pairs. If multiple players tie at the maximum sum, the tie is broken by **drawing tiebreak cards from the deck**: each still-tied player draws one card, the cards are placed on the discard pile, and the highest drawn value wins. If those draws are still tied, only the still-tied players repeat the procedure; if the deck runs out, the discard top is set aside, the rest is reshuffled into the deck, and the kept top is restored. This matches the rules-doc `[CHOSEN]` policy. **Modeling note:** the tiebreak draws are resolved inline within the SETUP_REVEAL state transition (consuming cards from the remaining-deck multiset using the state's seeded RNG and appending them to the discard pile) rather than exposed as explicit pyspiel chance nodes. Auto-resolved-chance semantics for our adapter are preserved, but if open_spiel's own algorithms (CFR/NFSP/PSRO) are later run against Skyjo directly, the tiebreak draws should be promoted to explicit chance nodes so EXPLICIT_STOCHASTIC is honored at the rule level.
 
 This is extensive-form imperfect-information done right. CFR is built for it. There is no `SIMULTANEOUS` GameType to opt into.
 
@@ -165,7 +165,7 @@ The implementation follows `docs/games/skyjo-rules.md` literally, including ever
 
 - Column elimination shrinks the grid; eliminated columns count as "not face-down" for the round-end trigger.
 - Round-ender doubling triggers on tie at lowest (strict literal reading per the rules doc).
-- Doubling applies to negative round-ender scores too (makes them more negative).
+- Doubling of negative round-ender scores is **capped at zero** per the rules-doc `[CHOSEN]` policy: the penalized score is `max(2 * raw_score, 0)`. A negative round-ender who isn't strictly lowest therefore ends the round at 0, never improved by the penalty.
 - Deck exhaustion: keep current discard top aside, shuffle the rest, place face-down as new draw pile, return kept top to discard.
 - Branch (b2) `DiscardAndFlip` is illegal when the player has zero face-down slots remaining.
 - Replacing a face-up card with a same-value card is legal; column elimination is re-checked after.

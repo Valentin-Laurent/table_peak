@@ -298,8 +298,10 @@ def test_three_face_up_identical_in_column_eliminates_column() -> None:
     # Layout: slot = row * 4 + col, with row in {0,1,2}, col in {0,1,2,3}.
     # column 0 -> slots 0, 4, 8.
     g = g.reveal(0).reveal(4).reveal(8)
-    g2, eliminated_cols = g.try_eliminate_columns()
-    assert eliminated_cols == [0]
+    g2, eliminated = g.try_eliminate_columns()
+    # Return shape: list of (column_index, common_value) pairs so callers can route
+    # the trio values to the discard pile per the rules-doc's elimination-ordering rule.
+    assert eliminated == [(0, 7)]
     assert g2.num_columns == 3
     assert g2.num_slots == 9
     # The remaining slots are re-indexed 0..8 in the same row-major order over surviving columns.
@@ -310,8 +312,8 @@ def test_three_face_up_identical_in_column_eliminates_column() -> None:
 def test_eliminate_does_not_fire_on_two_of_three_identical() -> None:
     g = Grid.from_dealt(values=[7, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0])
     g = g.reveal(0).reveal(8)  # only two of three
-    g2, eliminated_cols = g.try_eliminate_columns()
-    assert eliminated_cols == []
+    g2, eliminated = g.try_eliminate_columns()
+    assert eliminated == []
     assert g2.num_columns == 4
 
 
@@ -320,8 +322,8 @@ def test_multiple_simultaneous_eliminations() -> None:
     g = Grid.from_dealt(values=[5] * 12)
     for s in range(12):
         g = g.reveal(s)
-    g2, eliminated_cols = g.try_eliminate_columns()
-    assert sorted(eliminated_cols) == [0, 1, 2, 3]
+    g2, eliminated = g.try_eliminate_columns()
+    assert sorted(eliminated) == [(0, 5), (1, 5), (2, 5), (3, 5)]
     assert g2.num_slots == 0
 
 
@@ -476,20 +478,25 @@ class Grid:
         face_up[slot] = True
         return replace(self, _values=tuple(values), _face_up=tuple(face_up)), old_value
 
-    def try_eliminate_columns(self) -> tuple["Grid", list[int]]:
+    def try_eliminate_columns(self) -> tuple["Grid", list[tuple[int, int]]]:
         """If any column has 3 face-up cards of identical value, eliminate it (all columns
-        meeting the criterion eliminate simultaneously). Returns (new_grid, eliminated_column_indices_in_old_grid)."""
-        eliminated: list[int] = []
+        meeting the criterion eliminate simultaneously).
+
+        Returns (new_grid, eliminated) where `eliminated` is a list of
+        (column_index_in_old_grid, common_card_value) pairs — callers route those
+        values to the discard pile per the rules-doc elimination-ordering rule.
+        """
+        eliminated: list[tuple[int, int]] = []
         for col in range(self.num_columns):
             slots = [row * self.num_columns + col for row in range(NUM_ROWS)]
             if all(self._face_up[s] for s in slots):
                 values = {self._values[s] for s in slots}
                 if len(values) == 1:
-                    eliminated.append(col)
+                    eliminated.append((col, next(iter(values))))
         if not eliminated:
             return self, []
-        # Rebuild without eliminated columns.
-        keep_cols = [c for c in range(self.num_columns) if c not in eliminated]
+        eliminated_col_indices = {col for col, _ in eliminated}
+        keep_cols = [c for c in range(self.num_columns) if c not in eliminated_col_indices]
         new_num_columns = len(keep_cols)
         new_values: list[int] = []
         new_face_up: list[bool] = []
@@ -795,7 +802,7 @@ git commit -m "feat(skyjo): action ID encoding/decoding"
 
 Per `docs/games/skyjo-rules.md`:
 - Round score = sum of all face-up cards still in the player's grid (after the round-end reveal flips any remaining face-down cards). Eliminated columns contribute 0.
-- Round-ender penalty: if the round-ender's score is **not strictly the lowest**, it is **doubled**. Tie at lowest also triggers doubling. Negative scores are doubled too (becoming more negative).
+- Round-ender penalty: if the round-ender's score is **not strictly the lowest**, it is **doubled**, with the doubled result **capped at zero**. So the penalized score is `max(2 * raw, 0)`. Tie at lowest also triggers the doubling. A negative round-ender who is not strictly lowest therefore lands at 0 (the penalty never improves their score).
 
 - [ ] **Step 1: Write failing tests**
 
@@ -826,11 +833,26 @@ def test_doubling_on_tie_at_lowest() -> None:
     assert out == {0: 20, 1: 10, 2: 30}
 
 
-def test_doubling_with_negative_round_ender_score_makes_it_more_negative() -> None:
-    # negative + tie at lowest with another player at 0 -> doubled (more negative is "better")
+def test_doubling_caps_at_zero_when_round_ender_negative_and_not_strictly_lowest() -> None:
+    # negative round-ender, tied at lowest with another player -> doubling cap kicks in.
+    # max(2*-4, 0) = 0, so the penalized ender ends at 0 rather than improving to -8.
     raw = {0: -4, 1: -4, 2: 5}
     out = compute_round_scores(raw, round_ender=0)
-    assert out == {0: -8, 1: -4, 2: 5}
+    assert out == {0: 0, 1: -4, 2: 5}
+
+
+def test_doubling_caps_at_zero_when_round_ender_negative_and_not_lowest_at_all() -> None:
+    # negative round-ender, strictly above another negative -> doubling cap still kicks in.
+    raw = {0: -2, 1: -6, 2: 5}
+    out = compute_round_scores(raw, round_ender=0)
+    assert out == {0: 0, 1: -6, 2: 5}
+
+
+def test_doubling_of_zero_round_ender_when_tied_at_lowest_stays_zero() -> None:
+    # round-ender at 0 tied with another player at 0 -> max(2*0, 0) = 0.
+    raw = {0: 0, 1: 0, 2: 5}
+    out = compute_round_scores(raw, round_ender=0)
+    assert out == {0: 0, 1: 0, 2: 5}
 
 
 def test_doubling_with_strictly_lowest_negative() -> None:
@@ -861,18 +883,20 @@ def test_two_player_no_doubling_when_strictly_lowest() -> None:
 """Round-end scoring and doubling rules.
 
 Round-ender penalty: if the round-ender's score is not strictly the lowest among all
-players, it is doubled. Tie at lowest triggers doubling (rules-doc CHOSEN reading).
+players, it is doubled, with the result capped at zero: penalized = max(2 * raw, 0).
+Tie at lowest triggers the doubling (rules-doc CHOSEN reading). The zero cap ensures
+the penalty never improves a negative round-ender's score.
 """
 from __future__ import annotations
 
 
 def compute_round_scores(raw_scores: dict[int, int], *, round_ender: int) -> dict[int, int]:
-    """Apply the round-ender doubling rule to raw per-player sums.
+    """Apply the round-ender doubling rule (with zero-cap) to raw per-player sums.
 
     `raw_scores` is the sum of face-up card values per player (after final reveal),
     with eliminated columns contributing 0.
 
-    Returns a new dict with the doubling applied where appropriate.
+    Returns a new dict with the penalty applied where appropriate.
     """
     if round_ender not in raw_scores:
         raise ValueError(f"round_ender {round_ender} not in raw_scores")
@@ -881,7 +905,7 @@ def compute_round_scores(raw_scores: dict[int, int], *, round_ender: int) -> dic
     is_strictly_lowest = all(ender_score < s for s in others)
     if is_strictly_lowest:
         return dict(raw_scores)
-    return {p: (s * 2 if p == round_ender else s) for p, s in raw_scores.items()}
+    return {p: (max(s * 2, 0) if p == round_ender else s) for p, s in raw_scores.items()}
 ```
 
 - [ ] **Step 4: Run tests (PASS)**
@@ -906,7 +930,7 @@ git commit -m "feat(skyjo): round scoring + round-ender doubling"
 **Phases inside `SkyjoState`:**
 1. `Phase.DEAL` — chance nodes deal `12 * num_players` cards. Each `apply_action` consumes one card from the remaining shuffled deck and assigns it to (player p, slot s) following deterministic round-robin.
 2. `Phase.SETUP_COMMIT` — sequential decision nodes (player 0, 1, …). Each player picks a `RevealInitial(i, j)` action. Choice enters that player's private record only.
-3. `Phase.SETUP_REVEAL` — deterministic state transition (no action). After last player commits, all 2N chosen slots flip face-up publicly. Starting player computed: highest sum among the 2N reveals; ties broken by `random.Random(seed_for_tiebreak)` over the tied players. Phase advances to `MAIN_PLAY`.
+3. `Phase.SETUP_REVEAL` — deterministic state transition (no decision action). After last player commits, all 2N chosen slots flip face-up publicly. Starting player computed: highest sum among the 2N reveals. **Tiebreak procedure (per the rules-doc `[CHOSEN]` reading):** while more than one player is tied at the current maximum, each still-tied player draws one card from the deck multiset (sampled with `_rng_tiebreak` weighted by remaining counts), the drawn card is appended to `_discard_pile`, and the new tied set is taken to be those with the maximum drawn value. If the deck multiset is empty when a draw is needed, invoke `_recycle_discard_into_deck` first. Loop until a single winner remains; that player is the starting player. Phase advances to `MAIN_PLAY`. **Modeling note:** these tiebreak draws are resolved inline rather than promoted to explicit `pyspiel` chance nodes — see the spec for the rationale and the future-work note about CFR/NFSP/PSRO requiring the explicit-chance form.
 
 **Chance modeling for the deal:** Use sequential single-card chance nodes. At each chance step, `chance_outcomes()` returns the **remaining-deck distribution** (each unique remaining value has probability `count_in_remaining / total_remaining`). `_apply_action(value)` removes one copy of that value from the remaining deck and assigns it to the next slot in round-robin order. Why this form: open_spiel's `EXPLICIT_STOCHASTIC` mode wants explicit probabilities; enumerating 150! permutations is infeasible; the per-card form gives finite outcomes per node.
 
@@ -991,6 +1015,67 @@ def test_information_state_during_setup_hides_other_players_commits() -> None:
     info_p2 = state.information_state_string(2)
     assert "0,1" not in info_p1  # heuristic: no leak of player 0's chosen pair into others' info
     assert "0,1" not in info_p2
+
+
+def test_setup_reveal_conserves_total_card_count() -> None:
+    """Global invariant after SETUP_REVEAL resolves (incl. any tiebreak draws):
+    cards in grids + cards on discard + cards remaining in deck = 150.
+
+    This exercises the starting-player tiebreak path implicitly. Whether or not a
+    tiebreak fired for this seed, the conservation law must hold — and it will only
+    hold if every card drawn for tiebreak ends up on the discard pile (per the
+    rules-doc CHOSEN reading).
+    """
+    from table_peak.games.skyjo.actions import encode_reveal_initial
+    for seed in range(8):
+        state = _new_game(num_players=2, seed=seed).new_initial_state()
+        while state.is_chance_node():
+            state.apply_action(state.chance_outcomes()[0][0])
+        state.apply_action(encode_reveal_initial(0, 1))
+        state.apply_action(encode_reveal_initial(0, 1))
+        in_grids = sum(g.num_slots for g in state._grids)  # type: ignore[attr-defined]
+        in_discard = len(state._discard_pile)  # type: ignore[attr-defined]
+        in_deck = sum(state._remaining_deck_counts.values())  # type: ignore[attr-defined]
+        assert in_grids + in_discard + in_deck == 150, (
+            f"card conservation broken at seed {seed}: "
+            f"grids={in_grids} discard={in_discard} deck={in_deck}"
+        )
+
+
+def test_setup_tiebreak_when_forced_by_construction() -> None:
+    """Sweep a small seed range; for any seed where the initial 2-player reveals tie,
+    assert that (a) setup completes (a starting player is chosen), and (b) at least
+    one extra card was consumed from the deck and ended on the discard pile (the
+    rules-doc tiebreak procedure).
+
+    If no seed in the sweep produces a tie, the test passes vacuously — but the
+    conservation test above already exercises the no-tie path for those seeds.
+    """
+    from table_peak.games.skyjo.actions import encode_reveal_initial
+    saw_tie = False
+    for seed in range(64):
+        state = _new_game(num_players=2, seed=seed).new_initial_state()
+        while state.is_chance_node():
+            state.apply_action(state.chance_outcomes()[0][0])
+        state.apply_action(encode_reveal_initial(0, 1))
+        # After p0's commit, the deal phase has placed exactly 1 card on the initial discard.
+        discard_before_reveal = len(state._discard_pile)  # type: ignore[attr-defined]
+        state.apply_action(encode_reveal_initial(0, 1))
+        # SETUP_REVEAL is now resolved. If the two sums tied, tiebreak draws must
+        # have appended ≥ 2 extra cards (one per tied player per tiebreak round).
+        sums = [
+            state._grids[p].value(0) + state._grids[p].value(1)  # type: ignore[attr-defined]
+            for p in range(2)
+        ]
+        if sums[0] == sums[1]:
+            saw_tie = True
+            assert len(state._discard_pile) >= discard_before_reveal + 2  # type: ignore[attr-defined]
+            assert state.current_player() in {0, 1}
+            break
+    # Not strictly required, but documenting expectation: with 64 seeds, a tie should
+    # surface for at least one. If the sweep misses, the test still passes — the
+    # conservation invariant remains the primary guard.
+    _ = saw_tie
 ```
 
 - [ ] **Step 2: Run tests (FAIL — game not yet defined/registered)**
@@ -1037,6 +1122,8 @@ class SkyjoState(pyspiel.State):  # type: ignore[misc]
         super().__init__(game)
         self._num_players: int = num_players
         self._seed: int = seed
+        # Seeded RNG used for the setup-tiebreak draws. Sampling cards from
+        # _remaining_deck_counts is deterministic given the game seed.
         self._rng_tiebreak = random.Random(seed ^ 0xC0FFEE)
         self._phase: Phase = Phase.DEAL
 
@@ -1223,15 +1310,40 @@ class SkyjoState(pyspiel.State):  # type: ignore[misc]
             new_grids.append(g)
             sums[p] = g.value(i) + g.value(j)
         self._grids = new_grids
-        # Starting player: highest sum; ties broken by deterministic RNG over tied set.
+        # Starting player: highest sum; ties broken by drawing cards from the deck
+        # multiset (recurse on still-tied, reshuffle from discard if deck runs out).
         max_sum = max(sums.values())
         tied = [p for p, s in sums.items() if s == max_sum]
-        if len(tied) == 1:
-            self._starting_player = tied[0]
-        else:
-            self._starting_player = self._rng_tiebreak.choice(tied)
+        while len(tied) > 1:
+            draws: dict[int, int] = {}
+            for p in tied:
+                card = self._draw_tiebreak_card()
+                self._discard_pile.append(card)
+                draws[p] = card
+            max_draw = max(draws.values())
+            tied = [p for p, v in draws.items() if v == max_draw]
+        self._starting_player = tied[0]
         self._current_player_index = self._starting_player
         self._phase = Phase.MAIN_PLAY
+
+    def _draw_tiebreak_card(self) -> int:
+        """Sample one card from `_remaining_deck_counts` using `_rng_tiebreak`,
+        decrementing its count. If the deck is empty, invoke
+        `_recycle_discard_into_deck` first. Raises if both are empty.
+        """
+        total = sum(self._remaining_deck_counts.values())
+        if total == 0:
+            self._recycle_discard_into_deck()
+            total = sum(self._remaining_deck_counts.values())
+            if total == 0:
+                raise RuntimeError("deck exhausted with no discard to recycle for tiebreak")
+        values = sorted(self._remaining_deck_counts.keys())
+        weights = [self._remaining_deck_counts[v] for v in values]
+        chosen = self._rng_tiebreak.choices(values, weights=weights, k=1)[0]
+        self._remaining_deck_counts[chosen] -= 1
+        if self._remaining_deck_counts[chosen] == 0:
+            del self._remaining_deck_counts[chosen]
+        return chosen
 
     # ---------- placeholders for later tasks ----------
 
@@ -1568,10 +1680,21 @@ def _apply_branch_b_sub(self, action: int) -> None:
 
 
 def _post_turn_resolve(self) -> None:
-    """Column-elimination + round-end trigger + advance turn."""
+    """Column-elimination + round-end trigger + advance turn.
+
+    Per the rules-doc elimination-ordering rule: when an action that replaced
+    a grid card triggers elimination, the replaced card has already been
+    appended to `_discard_pile` by the action handler, so it sits BELOW the
+    eliminated trio cards we append here. When elimination fires from a
+    flip (no replacement), the trio is the only thing added.
+    """
     p = self._current_player_index
-    new_grid, _eliminated = self._grids[p].try_eliminate_columns()
+    new_grid, eliminated = self._grids[p].try_eliminate_columns()
     self._grids[p] = new_grid
+    for _col, value in eliminated:
+        # All three cards in an eliminated column share the same value; intra-trio
+        # ordering is irrelevant per the rules doc.
+        self._discard_pile.extend([value, value, value])
     if self._round_ender is None and new_grid.num_face_down == 0:
         # Trigger round-end: every other player gets exactly one final turn.
         self._round_ender = p
@@ -2390,22 +2513,27 @@ def test_column_erase_via_take_discard_replace() -> None:
         state.apply_action(state.chance_outcomes()[0][0])
     state.apply_action(encode_reveal_initial(0, 1))
     state.apply_action(encode_reveal_initial(0, 1))
-    # Just play out the round and assert SOME elimination happens at SOME player's grid
-    # OR the round ends with eliminated columns recorded. Loose assertion suffices —
-    # tighter scenarios require a test-only factory (deferred).
+    # Play out the round, watching for a column elimination and verifying that
+    # when one fires, three copies of the eliminated value appear on top of the
+    # discard pile (the rules-doc elimination-ordering rule).
     eliminations_seen = False
+    prev_columns = [g.num_columns for g in state._grids]  # type: ignore[attr-defined]
     while not state.is_terminal():
         if state.is_chance_node():
             state.apply_action(state.chance_outcomes()[0][0])
             continue
         state.apply_action(state.legal_actions()[0])
-        # Inspect underlying state via the .grids backdoor (acceptable for scenario testing).
-        for g in state._grids:  # type: ignore[attr-defined]
-            if g.num_columns < 4:
+        new_columns = [g.num_columns for g in state._grids]  # type: ignore[attr-defined]
+        for p, (before, after) in enumerate(zip(prev_columns, new_columns, strict=True)):
+            if after < before:
                 eliminations_seen = True
-                break
+                # Per the rules-doc ordering: the eliminated trio sits at the top of
+                # the discard pile. Three copies of one identical value.
+                top3 = state._discard_pile[-3:]  # type: ignore[attr-defined]
+                assert len(top3) == 3
+                assert top3[0] == top3[1] == top3[2]
+        prev_columns = new_columns
     # Loose: with seed 0, eliminations are likely; tighten with a curated seed if flaky.
-    # For now, just ensure the game ran without errors.
     assert state.is_terminal()
 ```
 

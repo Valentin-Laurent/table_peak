@@ -26,7 +26,7 @@ Binary, machine-checkable:
 
 1. `python -m table_peak.training.train` produces `runs/<run_id>/` containing `metrics.csv`, `hparams.json`, `checkpoints/`. `run_id` is timestamp-derived and lex-sorts chronologically.
 2. `python -m table_peak.training.viz --latest` (or `--run <id>`), launched in a second terminal during step 1, renders live-updating plotext charts. New rows appear in the viewer within ~1s of being written.
-3. Viewer renders TTT metrics (`policy_loss`, `value_loss`, `entropy`, `total_loss`, `non_loss_vs_random`, `loss_vs_minimax`) without any TTT-specific code path — purely from the CSV header.
+3. Viewer renders TTT metrics (`policy_loss`, `value_loss`, `entropy`, `mean_return`, `non_loss_vs_random`, `loss_vs_minimax`) without any TTT-specific code path — purely from the CSV header.
 4. `RunStore` Port + `FileRunStore` adapter exist; the viewer never imports `Run` or training internals.
 5. `mypy --strict`, `ruff check`, `ruff format --check` clean. Macro tests pass.
 
