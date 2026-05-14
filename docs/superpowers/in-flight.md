@@ -50,3 +50,14 @@ Each entry below describes a feature currently being developed in parallel with 
     - src/table_peak/games/skyjo/**
     - src/table_peak/games/_pyspiel_adapter.py
     - tests/games/skyjo/**
+
+- name: python-workflow-zero-trust
+  spec_path: docs/superpowers/specs/2026-05-14-python-workflow-zero-trust-design.md
+  branch: feature/python-workflow-zero-trust
+  worktree_path: TBD
+  status: spec_drafted
+  scope_summary: Keep `uv` as package manager but flatten the permission surface via a Makefile wrapper layer + broader user-global Bash matchers (`Bash(make:*)`, `Bash(uv:*)`, diagnostic pipe helpers). Settings.json edits surfaced as a diff for manual apply (sandbox denies direct writes to settings files).
+  forbidden_zones:
+    - Makefile
+    - docs/superpowers/specs/2026-05-14-python-workflow-zero-trust-design.md
+    - docs/superpowers/plans/2026-05-14-python-workflow-zero-trust-plan.md
