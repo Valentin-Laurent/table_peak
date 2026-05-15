@@ -16,7 +16,7 @@ Make the day-to-day Python workflow in `table_peak` survive the user's zero-trus
 - **No dependency changes.** `pyproject.toml` is touched only if the wrapper layer needs a script entry; no `add` / `remove` of deps as part of this work.
 - **No project-local settings file.** Per user decision, permissions live in user-global `~/.claude/settings.json` so the same shape works across all the user's projects (sequoia, MAPIE, claude_home, table_peak). No `.claude/settings.json` is created in this repo.
 - **No replacement of `rtk`.** The existing `rtk hook claude` PreToolUse hook stays.
-- **No automated edit of `settings.json` by Claude.** The sandbox lists both `~/.claude/settings.json` and `<project>/.claude/settings.json` in `denyWithinAllow`; Claude cannot write either. The execution plan surfaces the exact diff for the user to apply manually (or via the `update-config` skill).
+- **No automated edit of `settings.json` by Claude.** The sandbox lists both `~/.claude/settings.json` and `<project>/.claude/settings.json` in `denyWithinAllow`; Claude cannot write either. The execution plan surfaces the **complete intended `~/.claude/settings.json`** (not a diff) for the user to paste wholesale (or apply via the `update-config` skill).
 
 ## Success criteria (binary, machine-checkable)
 
@@ -65,14 +65,16 @@ Per user decision, the rules live in user-global settings so they cover every pr
 - **Add** filesystem `allowWrite` paths if `uv sync` actually trips on something outside the current list (TBD until success criterion 3 is exercised; candidates: `~/.local/state/uv`, `~/.cache/pip` if uv falls back to pip resolution; the project's `.venv` is already covered by the per-project allowWrite).
 - **Do not** add `Bash(*)` or any catch-all. Zero-trust posture is preserved at the file/network layer; what we're loosening is the *dev-tool surface*, not the *destructive-action surface*.
 
-### Application mechanism: surfaced diff, not direct edit
+### Application mechanism: full settings.json, not a diff
 
 Both `~/.claude/settings.json` and `<project>/.claude/settings.json` are in the sandbox's `denyWithinAllow` list. Claude cannot write either. The execution plan therefore produces:
 
-1. The exact additions/removals as a JSON diff (or before/after snippet).
-2. Instructions to apply via either (a) manual edit by the user, or (b) the `update-config` skill if `Skill` is allowlisted at that point.
+1. The **complete intended `~/.claude/settings.json`** as a single fenced code block — every key the file should contain after the change, not just the delta. This eliminates the "diff misapplication" failure mode and makes a single copy-paste sufficient.
+2. Instructions to apply via either (a) manual paste by the user, or (b) the `update-config` skill if `Skill` is allowlisted at that point.
 
 The Makefile *can* be created by Claude (project filesystem is writable). The settings change *cannot* — that step is the user's hand on the keyboard, on purpose, because settings.json is a high-trust file.
+
+Authoring the full file means execution must (a) read the *current* `~/.claude/settings.json` first to capture every key/value the user already relies on (model, hooks, statusLine, theme, sandbox config, additionalDirectories, the unrelated permission rules, etc.), and (b) emit a version that preserves all of those untouched, modifying only the `permissions.allow` list per this spec.
 
 ### Cross-project effect
 
