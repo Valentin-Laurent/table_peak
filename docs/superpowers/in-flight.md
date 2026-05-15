@@ -54,8 +54,8 @@ Each entry below describes a feature currently being developed in parallel with 
 - name: python-workflow-zero-trust
   spec_path: docs/superpowers/specs/2026-05-14-python-workflow-zero-trust-design.md
   branch: feature/python-workflow-zero-trust
-  worktree_path: TBD
-  status: spec_drafted
+  worktree_path: in-place
+  status: dispatched
   scope_summary: Keep `uv` as package manager but flatten the permission surface via a Makefile wrapper layer + broader user-global Bash matchers (`Bash(make:*)`, `Bash(uv:*)`, diagnostic pipe helpers). Settings change surfaced as a full `~/.claude/settings.json` for manual paste (sandbox denies direct writes to settings files).
   forbidden_zones:
     - Makefile
