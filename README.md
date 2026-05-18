@@ -1,6 +1,6 @@
 # table_peak
 
-Game-playing agents for tabletop games.
+Training AI agents to play tabletop games.
 
 This project is vibe-researched and vibe-coded, mostly using Claude
 Code and the [superpowers](https://github.com/obra/superpowers) plugin. It
