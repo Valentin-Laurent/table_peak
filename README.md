@@ -2,27 +2,22 @@
 
 Game-playing agents for tabletop games.
 
-The goals: have fun, explore strategies for the games included, surface
-balance suggestions for game designers, and — long-term — train a single
-agent that plays all the games.
-
-This project is entirely vibe-researched and vibe-coded, mostly using Claude
+This project is vibe-researched and vibe-coded, mostly using Claude
 Code and the [superpowers](https://github.com/obra/superpowers) plugin. It
 draws on patterns from open RL / game-AI work; I've tried to follow license
 rules for anything reused — please open an issue if you spot an attribution
 gap.
 
+Project goals:
+ - explore strategies for the games included
+ - surface balance suggestions for game designers
+ - refine my agentic coding setup for greenfield projects
+
 ## Roadmap
 
-In flight (see [`docs/superpowers/in-flight.md`](docs/superpowers/in-flight.md)):
+In progress: see [`docs/superpowers/in-flight.md`](docs/superpowers/in-flight.md)
 
-- **Training progress viewer** —
-  [spec](docs/superpowers/specs/2026-05-10-training-progress-viewer-design.md).
-- **Skyjo engine** —
-  [spec](docs/superpowers/specs/2026-05-10-skyjo-engine-design.md).
-
-End-goals (restated): fun, strategy exploration, balance suggestions for game
-designers, one agent across all games.
+Next: who knows?
 
 **Suggest a game** — game designers and creators, please open an issue with
 the rules and player count; I'd love to add more games.
