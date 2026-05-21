@@ -1,12 +1,21 @@
 # Python workflow under zero-trust — Design
 
-**Date:** 2026-05-14
-**Status:** Draft, awaiting user review
+**Date:** 2026-05-14 (revised 2026-05-15)
+**Status:** Drafted, in execution
 **Slug:** `python-workflow-zero-trust`
 
 ## Goal
 
-Make the day-to-day Python workflow in `table_peak` survive the user's zero-trust Claude Code sandbox without manual permission edits per command. Keep `uv` as the package/project manager (it remains best-in-class); flatten the *permission surface* via a Makefile wrapper layer and broader Bash matchers, and close any residual filesystem/network gaps that `uv sync` actually trips on.
+Make the day-to-day Python workflow in `table_peak` survive the user's zero-trust Claude Code setup without manual permission edits per command. Keep `uv` as the package/project manager (it remains best-in-class); flatten the *permission surface* via a Makefile wrapper layer and broader Bash matchers; and resolve the **macOS-sandbox incompatibility** uv has with Claude Code's seatbelt profile.
+
+## Execution finding (2026-05-15) — the problem is two-layered, not one
+
+The first execution step (`uv sync` and `uv run X` inside the current sandbox) revealed that the friction has two independent causes:
+
+1. **Permission layer (the originally-suspected one).** Per-uv-subcommand `Bash(...)` allows are brittle; pipes break matchers; daily friction. **Solved by:** Makefile wrapper + broader matchers — the original design.
+2. **macOS sandbox layer (newly discovered).** Both `uv sync` and `uv run X` panic inside the Claude Code sandbox at `system-configuration-0.6.1/src/dynamic_store.rs:154` — a `SCDynamicStoreCreate` call (uv's HTTP client `reqwest` probing macOS network/proxy config at startup, before any subcommand logic). The sandbox profile denies the Mach lookup for this service. No `permissions.allow` entry fixes this because the failure is below the permission layer. The only escape hatch — `dangerouslyDisableSandbox=true` on each Bash call — is itself auto-denied under `defaultMode: dontAsk`.
+
+The original spec assumed only layer 1. Layer 2 forces a choice; see "Sandbox layer" architectural decision below.
 
 ## Non-goals (explicit YAGNI)
 
@@ -16,6 +25,7 @@ Make the day-to-day Python workflow in `table_peak` survive the user's zero-trus
 - **No dependency changes.** `pyproject.toml` is touched only if the wrapper layer needs a script entry; no `add` / `remove` of deps as part of this work.
 - **No project-local settings file.** Per user decision, permissions live in user-global `~/.claude/settings.json` so the same shape works across all the user's projects (sequoia, MAPIE, claude_home, table_peak). No `.claude/settings.json` is created in this repo.
 - **No replacement of `rtk`.** The existing `rtk hook claude` PreToolUse hook stays.
+- **No partial sandbox bypass per call.** `dangerouslyDisableSandbox=true` per Bash invocation is auto-denied under `dontAsk` and would prompt the user N times per session if `dontAsk` were relaxed — not workable. The sandbox decision is binary (see architectural decisions).
 - **No automated edit of `settings.json` by Claude.** The sandbox lists both `~/.claude/settings.json` and `<project>/.claude/settings.json` in `denyWithinAllow`; Claude cannot write either. The execution plan surfaces the **complete intended `~/.claude/settings.json`** (not a diff) for the user to paste wholesale (or apply via the `update-config` skill).
 
 ## Success criteria (binary, machine-checkable)
@@ -27,11 +37,34 @@ Make the day-to-day Python workflow in `table_peak` survive the user's zero-trus
    - `make typecheck`
    - `make test`
 2. `make help` lists all available targets with a one-line description each.
-3. Running `uv sync` directly (via `Bash(uv …)`) succeeds end-to-end without any permission prompt and without any sandbox-denied filesystem/network errors.
-4. The user-global `~/.claude/settings.json` contains the new permission shape, with the three now-redundant per-`uv`-subcommand rules removed (`Bash(uv run ruff check*)`, `Bash(uv run mypy*)`, `Bash(uv sync*)`).
+3. Running `uv sync` directly (via `Bash(uv …)`) succeeds end-to-end — no permission prompt, no sandbox panic.
+4. The user-global `~/.claude/settings.json` contains the new permission shape, with the three now-redundant per-`uv`-subcommand rules removed (`Bash(uv run ruff check*)`, `Bash(uv run mypy*)`, `Bash(uv sync*)`), and `sandbox.enabled: false` (see "Sandbox layer" decision).
 5. `mypy --strict` and `ruff check` clean on any new Python files (expected: zero — this is a tooling change).
 
 ## Architectural decisions
+
+### Sandbox layer: disable macOS sandbox; keep permission-layer zero-trust
+
+Given the layer-2 finding, three paths exist:
+
+| Path | Action | Verdict |
+|---|---|---|
+| **A. Disable the macOS sandbox** | Set `sandbox.enabled: false`; rely on `permissions.allow` / `denyRead` for zero-trust | **Chosen.** Permission layer remains; uv works; Makefile pays off. |
+| B. Keep sandbox, bypass per call | `dangerouslyDisableSandbox=true` on every uv-bearing Bash call | Auto-denied under `dontAsk`; relaxing `dontAsk` introduces N prompts per session. Not workable. |
+| C. Replace uv | Use `pip`/`poetry`/`pdm` (all use urllib/requests, no SystemConfiguration Mach lookup) | User explicitly ruled this out. |
+
+**Path A trade-off:** Claude operates inside the same permission rules as before — what changes is that the OS-level filesystem/network containment (a second defense layer) is dropped. The permission layer is still load-bearing: `Read(./**)` / `Write(./**)` / `denyRead(~/.ssh/)` etc. continue to gate Claude's actions. "Zero-trust at the permission layer, not at the OS-sandbox layer" is the honest framing.
+
+**What gets preserved when sandbox is disabled:**
+- All `permissions.allow` rules (Bash matchers, file scopes, network domain allows in their permission form).
+- The `rtk hook claude` PreToolUse hook.
+- All read-deny rules expressed as the absence of an `allow` entry.
+
+**What gets lost:**
+- macOS-level mandatory filesystem isolation (seatbelt-enforced). A bug in Claude that bypasses its own permission check would no longer be caught at the OS layer. Mitigation: the bug surface is the same as a normal terminal session; nothing about this project is more sensitive than the rest of the user's machine.
+- `sandbox.network.allowedDomains` becomes inert. Network access is governed by whatever the OS / user's network setup allows. Practical effect: minimal, since none of the project's external services were outside the existing allowedDomains list.
+
+**Why not narrow the macOS sandbox profile to permit SystemConfiguration?** Settings.json exposes only filesystem paths and network hosts. Mach-service allowlisting is not user-configurable today. That's an upstream Claude Code issue, not in scope here.
 
 ### Wrapper layer = Makefile, not a `scripts/` directory
 
@@ -57,13 +90,14 @@ Run-targets for application entry points (`train`, `viz`, `play`, etc.) are **ou
 
 Per user decision, the rules live in user-global settings so they cover every project the user works in. The shape:
 
+- **Set `sandbox.enabled: false`** (see "Sandbox layer" above).
 - **Remove** the three now-redundant per-uv-subcommand rules: `Bash(uv run ruff check*)`, `Bash(uv run mypy*)`, `Bash(uv sync*)`.
 - **Add** two broader rules:
   - `Bash(make:*)` — primary dev workflow surface. Covers `make sync`, `make lint`, `make test`, `make check`, etc., across every project.
   - `Bash(uv:*)` — ad-hoc `uv` for diagnosis, one-off installs, lockfile checks. Kept deliberately broad: the threat model here is "Claude does something weird with uv," and any uv subcommand can already mutate the lockfile or environment, so subcommand-level granularity is theater.
 - **Add** common read-only diagnostic helpers used in pipes: `Bash(tail:*)`, `Bash(head:*)`, `Bash(grep:*)`, `Bash(wc:*)`, `Bash(sort:*)`, `Bash(uniq:*)`. These are the segments that get denied today when the user runs `uv sync 2>&1 | tail -20`.
-- **Add** filesystem `allowWrite` paths if `uv sync` actually trips on something outside the current list (TBD until success criterion 3 is exercised; candidates: `~/.local/state/uv`, `~/.cache/pip` if uv falls back to pip resolution; the project's `.venv` is already covered by the per-project allowWrite).
-- **Do not** add `Bash(*)` or any catch-all. Zero-trust posture is preserved at the file/network layer; what we're loosening is the *dev-tool surface*, not the *destructive-action surface*.
+- **Leave** `sandbox.network.allowedDomains` and `sandbox.filesystem.{allowWrite,denyRead}` as-is. They are inert while `sandbox.enabled: false` but become active again if the user ever re-enables the macOS sandbox.
+- **Do not** add `Bash(*)` or any catch-all. The dev-tool surface is what we're loosening; destructive-action permissions stay narrow.
 
 ### Application mechanism: full settings.json, not a diff
 
@@ -85,9 +119,9 @@ These rules will apply to sequoia, MAPIE, and claude_home as well. Implications:
 - The diagnostic-pipe helpers are inherently read-only on input, so user-wide is harmless.
 - If any of those other projects has a Makefile target that does something destructive, the user is the one who wrote it; this is consistent with the trust model.
 
-### Diagnostic-first ordering
+### Diagnostic-first ordering (executed 2026-05-15)
 
-Before settling on which extra filesystem/network paths to allow, the first work step in execution is: run `uv sync` from inside the new permission shape and see what (if anything) still fails. The spec lists *candidate* additions but commits to **only** what's actually needed. This keeps the allowlist honest.
+The first execution step was to actually run `uv sync` under the current sandbox to see what failed. The result reshaped the spec — see "Execution finding" at the top. Without that step, the design would have shipped an allowlist expansion that fixed nothing.
 
 ### Coordination with sibling features
 
@@ -135,9 +169,11 @@ No automated test suite is added; the wrapper is config, not logic.
 | Sibling features add Make targets concurrently → merge conflict. | Conflict is a 3-line resolution. The Makefile structure is intentionally flat (one target per stanza) to make conflicts mechanical. |
 | The "candidate" filesystem allowWrite additions turn out to be wrong / insufficient. | Investigation step (execution step 1) actually runs `uv sync` and reports what fails; precise additions are derived from that output, not guessed. |
 | Loosening prompts encourages riskier auto-actions by Claude. | Out of scope. The wrapper layer's purpose is reducing friction for *expected* dev commands; destructive operations (git push, rm, etc.) remain prompt-gated. |
+| Disabling the macOS sandbox layer loses a defense layer. | Accepted trade-off (see "Sandbox layer" decision). Permission layer still gates Claude; user's machine isn't more exposed than during a normal terminal session. If upstream Claude Code later adds Mach-service allowlisting, the user can re-enable `sandbox.enabled: true` with no other change. |
 
-## Decisions resolved during brainstorm
+## Decisions resolved during brainstorm and execution
 
 1. **User-global settings, not project-local.** Same shape applies across all the user's projects. (Decided 2026-05-14.)
 2. **Redundant `Bash(uv …)` rules are removed**, not left alongside the new broader rules. (Decided 2026-05-14.)
 3. **`make format` is included** in v1. The marginal risk over already-allowed `Edit`/`Write` is low; if Claude becomes over-eager, the fix is a CLAUDE.md guideline, not a permission boundary. (Decided 2026-05-14.)
+4. **macOS sandbox is disabled** (`sandbox.enabled: false`) as the only viable way to keep `uv` in a `dontAsk` workflow. Permission layer continues to enforce zero-trust. (Decided 2026-05-15, after execution finding.)
