@@ -25,13 +25,4 @@ Each entry below describes a feature currently being developed in parallel with 
 
 ## Entries
 
-- name: skyjo-engine
-  spec_path: docs/superpowers/specs/2026-05-10-skyjo-engine-design.md
-  branch: feature/skyjo-engine
-  worktree_path: TBD
-  status: spec_drafted
-  scope_summary: Skyjo rules engine in `src/table_peak/games/skyjo/` as a `pyspiel.Game` (open_spiel custom-game), parameterized 2–8 players, single round, plus a generic `pyspiel.State` → our `State` Protocol wrapper Port. No agents, no UI, no training in scope.
-  forbidden_zones:
-    - src/table_peak/games/skyjo/**
-    - src/table_peak/games/_pyspiel_adapter.py
-    - tests/games/skyjo/**
+_(none — no features currently in flight)_

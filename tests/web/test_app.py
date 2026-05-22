@@ -92,7 +92,7 @@ def _create_game(client: TestClient, x_agent: str, o_agent: str) -> str:
         follow_redirects=False,
     )
     assert r.status_code == 303
-    return r.headers["location"].rsplit("/", 1)[-1]
+    return str(r.headers["location"]).rsplit("/", 1)[-1]
 
 
 def test_human_vs_bot_first_move_advances_bot_reply(client: TestClient) -> None:
