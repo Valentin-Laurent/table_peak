@@ -24,20 +24,22 @@ the rules and player count; I'd love to add more games.
 
 ## Quickstart
 
-Requires Python ≥3.12 and [`uv`](https://docs.astral.sh/uv/).
+Requires Python ≥3.12 and [`pdm`](https://pdm-project.org/).
 
 ```sh
-uv sync
-uv run pytest -m "not slow"
-uv run uvicorn table_peak.web.app:app --reload
+make sync                  # pdm install — sync deps from pdm.lock into .venv
+make test                  # run the test suite
+.venv/bin/uvicorn table_peak.web.app:app --reload
 ```
+
+Run `make help` for the full list of dev targets.
 
 Open <http://localhost:8000/> to play TicTacToe against a trained agent. The
 training entry point is `table_peak.training.loop.train`.
 
 ## Development
 
-Tooling: `uv`, `ruff`, `mypy --strict`, `pytest`, `pre-commit` — config in
+Tooling: `pdm`, `ruff`, `mypy --strict`, `pytest`, `pre-commit` — config in
 [`pyproject.toml`](pyproject.toml) and
 [`.pre-commit-config.yaml`](.pre-commit-config.yaml). Work follows the
 superpowers workflow (brainstorm → spec → plan → implement) under
