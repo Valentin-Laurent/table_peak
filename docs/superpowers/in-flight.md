@@ -25,4 +25,29 @@ Each entry below describes a feature currently being developed in parallel with 
 
 ## Entries
 
-_(none — no features currently in flight)_
+```yaml
+- name: skyjo-web-play
+  spec_path: docs/superpowers/specs/2026-06-05-skyjo-web-play-design.md
+  branch: feature/skyjo-web-play
+  worktree_path: TBD
+  status: spec_drafted
+  scope_summary: >
+    Play one full round of Skyjo in the browser (human player 0 vs N Random bots,
+    2-8 total). Generalizes the TTT web stack the minimal amount to host a second
+    game; auto-randomizes setup and drops the human into main play to round-end.
+  forbidden_zones:
+    - src/table_peak/web/renderers/skyjo.py
+    - src/table_peak/web/templates/_skyjo_board.html
+    - tests/web/test_skyjo_play.py
+    # Shared files this feature also modifies (coordinate before touching):
+    - src/table_peak/web/app.py
+    - src/table_peak/web/sessions.py
+    - src/table_peak/web/agents.py
+    - src/table_peak/web/renderers/__init__.py
+    - src/table_peak/web/templates/new_game.html
+    - src/table_peak/web/templates/game.html
+    - src/table_peak/web/templates/_board.html
+    - src/table_peak/games/skyjo/state.py
+    - src/table_peak/games/skyjo/__init__.py
+    - src/table_peak/games/_pyspiel_adapter.py
+```
