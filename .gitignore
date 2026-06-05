@@ -36,3 +36,4 @@ runs/
 # Git worktrees (used for subagent-driven-development)
 .worktrees/
 .claude/worktrees/
+.superpowers/
