@@ -65,3 +65,51 @@ def test_create_skyjo_game_rejects_bad_player_count(client: TestClient) -> None:
         follow_redirects=False,
     )
     assert r.status_code == 400
+
+
+def test_create_skyjo_game_renders_board(client: TestClient) -> None:
+    r = client.post(
+        "/games",
+        data={"game": "skyjo", "num_players": "3"},
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    assert r.text.count("Skyjo") >= 1
+    assert 'id="board"' in r.text
+    # The human is on a main-play turn: the Draw button is present.
+    assert "Draw from deck" in r.text
+
+
+def _post_first_legal_human_action(client: TestClient, game_id: str, html: str) -> str:
+    """Parse the board fragment, post the first legal human action, return new html.
+
+    The renderer puts each legal action in `name="action" value="N"`. We pick the
+    first one (any legal move keeps the round progressing toward terminal)."""
+    import re
+
+    matches = re.findall(r'name="action" value="(\d+)"', html)
+    assert matches, f"no clickable action in board:\n{html[:500]}"
+    action = matches[0]
+    r = client.post(f"/games/{game_id}/move", data={"action": action})
+    assert r.status_code == 200, r.text
+    return str(r.text)
+
+
+def test_full_round_playthrough_reaches_terminal_with_scores(client: TestClient) -> None:
+    r = client.post(
+        "/games",
+        data={"game": "skyjo", "num_players": "2"},
+        follow_redirects=False,
+    )
+    game_id = str(r.headers["location"]).rsplit("/", 1)[-1]
+    html = client.get(f"/games/{game_id}").text
+
+    # Drive the human by always taking the first offered legal action. The round
+    # is finite, so this terminates. Cap iterations as a safety net.
+    for _ in range(500):
+        if "Round over" in html:
+            break
+        html = _post_first_legal_human_action(client, game_id, html)
+    assert "Round over" in html
+    # The score table is present (one row per player => at least two <td> score cells).
+    assert html.count("</td>") >= 4

@@ -1,0 +1,102 @@
+<div id="board">
+    <style>
+        .skyjo { font-family: system-ui, sans-serif; }
+        .opps { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 12px; }
+        .panel { border: 1px solid #39414f; border-radius: 8px; padding: 8px; }
+        .panel.you { border-color: #4f9d5b; }
+        .panel .tag { font-size: 11px; opacity: .8; margin-bottom: 4px; }
+        .sgrid { display: grid; gap: 3px; }
+        .card { width: 40px; height: 52px; border-radius: 5px; display: flex; align-items: center;
+                justify-content: center; font-weight: 700; color: #fff; border: none; font-size: 14px; }
+        .card.mini { width: 26px; height: 34px; font-size: 10px; }
+        button.card { cursor: pointer; }
+        .fd { background: #5b6472; color: #aeb6c2; } .neg { background: #3b6fb0; }
+        .zero { background: #8a93a2; } .lo { background: #4f9d5b; }
+        .mid { background: #d9a23b; } .hi { background: #c0504d; }
+        .piles { display: flex; gap: 16px; justify-content: center; align-items: center; margin: 10px 0; }
+        .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+        .status { font-size: 1.1rem; margin: 8px 0; }
+        table.scores { margin: 8px 0; border-collapse: collapse; }
+        table.scores td { border: 1px solid #ccc; padding: 2px 10px; }
+    </style>
+
+    <div class="skyjo">
+        <p class="status">{{ view.status }}</p>
+
+        <div class="opps">
+            {% for opp in view.opponents %}
+            <div class="panel">
+                <div class="tag">{{ opp.label }} · sum {{ opp.face_up_sum }}{% if opp.is_current %} · ▶{% endif %}</div>
+                <div class="sgrid" style="grid-template-columns: repeat({{ opp.num_columns }}, 1fr);">
+                    {% for card in opp.cards %}
+                    <span class="card mini {{ card.css }}">{{ card.label }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="piles">
+            <div style="text-align:center;">
+                <span class="card fd">{{ view.draw_pile_size }}</span>
+                <div class="tag">draw</div>
+            </div>
+            <div style="text-align:center;">
+                {% if view.discard_top is not none %}
+                <span class="card {{ view.discard_css }}">{{ view.discard_top }}</span>
+                {% else %}
+                <span class="card fd">—</span>
+                {% endif %}
+                <div class="tag">discard</div>
+            </div>
+            {% if view.drawn_card is not none %}
+            <div style="text-align:center;">
+                <span class="card {{ view.drawn_css }}">{{ view.drawn_card }}</span>
+                <div class="tag">drawn</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="panel you">
+            <div class="tag">{{ view.you.label }} · sum {{ view.you.face_up_sum }}{% if view.you.is_current %} · ▶{% endif %}</div>
+            <div class="sgrid" style="grid-template-columns: repeat({{ view.you.num_columns }}, 1fr);">
+                {% for card in view.you.cards %}
+                    {% if card.clickable %}
+                    <form hx-post="/games/{{ view.game_id }}/move" hx-target="#board" hx-swap="outerHTML"
+                          style="display:contents;">
+                        <button type="submit" class="card {{ card.css }}" name="action" value="{{ card.action }}">{{ card.label }}</button>
+                    </form>
+                    {% else %}
+                    <span class="card {{ card.css }}">{{ card.label }}</span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if not view.is_terminal %}
+        <div class="controls">
+            {% if view.can_draw %}
+            <form hx-post="/games/{{ view.game_id }}/move" hx-target="#board" hx-swap="outerHTML">
+                <button type="submit" name="action" value="{{ view.draw_action }}">Draw from deck</button>
+            </form>
+            {% endif %}
+            {% if view.flip_buttons %}
+            <span>Discard {{ view.drawn_card }} &amp; flip:</span>
+            {% for fb in view.flip_buttons %}
+            <form hx-post="/games/{{ view.game_id }}/move" hx-target="#board" hx-swap="outerHTML">
+                <button type="submit" name="action" value="{{ fb.action }}">slot {{ fb.slot }}</button>
+            </form>
+            {% endfor %}
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if view.is_terminal %}
+        <table class="scores">
+            {% for label, score in view.final_scores %}
+            <tr><td>{{ label }}</td><td>{{ score }}</td></tr>
+            {% endfor %}
+        </table>
+        {% endif %}
+    </div>
+</div>
