@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -63,7 +64,7 @@ def create_game(
     if game == "skyjo":
         if not 2 <= num_players <= 8:
             raise HTTPException(status_code=400, detail="num_players must be in [2, 8]")
-        session = new_skyjo_session(num_players=num_players)
+        session = new_skyjo_session(num_players=num_players, seed=secrets.randbelow(2**31))
     elif game == "tic_tac_toe":
         agents: dict[PlayerId, Agent | None] = {
             0: _build_agent(x_agent),
