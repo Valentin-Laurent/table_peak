@@ -7,28 +7,54 @@
         body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
         label { display: block; margin: 0.5rem 0; }
         select, button { font-size: 1rem; padding: 0.25rem 0.5rem; }
+        fieldset { margin: 1rem 0; }
     </style>
 </head>
 <body>
     <h1>New Game</h1>
+
     <form action="/games" method="post">
-        <label>
-            X (first to move):
-            <select name="x_agent">
-                <option value="Human" selected>Human</option>
-                <option value="Random">Random</option>
-                <option value="Minimax">Minimax</option>
-            </select>
-        </label>
-        <label>
-            O:
-            <select name="o_agent">
-                <option value="Human">Human</option>
-                <option value="Random">Random</option>
-                <option value="Minimax" selected>Minimax</option>
-            </select>
-        </label>
-        <button type="submit">Start</button>
+        <fieldset>
+            <legend>Tic-Tac-Toe</legend>
+            <input type="hidden" name="game" value="tic_tac_toe">
+            <label>
+                X (first to move):
+                <select name="x_agent">
+                    <option value="Human" selected>Human</option>
+                    <option value="Random">Random</option>
+                    <option value="Minimax">Minimax</option>
+                </select>
+            </label>
+            <label>
+                O:
+                <select name="o_agent">
+                    <option value="Human">Human</option>
+                    <option value="Random">Random</option>
+                    <option value="Minimax" selected>Minimax</option>
+                </select>
+            </label>
+            <button type="submit">Start Tic-Tac-Toe</button>
+        </fieldset>
+    </form>
+
+    <form action="/games" method="post">
+        <fieldset>
+            <legend>Skyjo (you vs Random bots)</legend>
+            <input type="hidden" name="game" value="skyjo">
+            <label>
+                Players:
+                <select name="num_players">
+                    <option value="2" selected>2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                </select>
+            </label>
+            <button type="submit">Start Skyjo</button>
+        </fieldset>
     </form>
 </body>
 </html>
