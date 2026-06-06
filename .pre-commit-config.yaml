@@ -9,7 +9,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy (uv run)
-        entry: uv run mypy --strict src tests
+        entry: pdm run mypy --strict src tests
         language: system
         pass_filenames: false
         files: \.py$

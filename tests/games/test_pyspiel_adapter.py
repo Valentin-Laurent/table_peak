@@ -52,3 +52,17 @@ def test_terminal_returns_dict_per_player() -> None:
     assert isinstance(rs, dict)
     assert set(rs.keys()) == {0, 1}
     assert all(isinstance(v, float) for v in rs.values())
+
+
+def test_inner_exposes_underlying_python_state() -> None:
+    """The adapter exposes the wrapped pyspiel state so renderers can read a
+    game-specific public view. Reading a Python-defined attribute through
+    `.inner` must work (the wrapped object is the Python State subclass)."""
+    from table_peak.games.skyjo import SkyjoGameWrapper
+
+    game = SkyjoGameWrapper(num_players=2, seed=7)
+    state = game.new_initial_state()
+    inner = state.inner
+    # `_num_players` is a Python attribute on SkyjoState — proves we hold the
+    # Python instance, not a bare C++ view.
+    assert inner._num_players == 2

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Sequence
+from typing import Any
 
 import pyspiel  # type: ignore[import-not-found]
 
@@ -26,6 +27,15 @@ class PyspielStateAdapter:
             inner.apply_action(chosen)
         self._inner: pyspiel.State = inner
         self._rng: random.Random = rng
+
+    @property
+    def inner(self) -> Any:
+        """The wrapped pyspiel.State (a game-specific Python State subclass).
+
+        Game-agnostic consumers use the State Protocol surface; game-specific
+        renderers read richer structure (e.g. Skyjo's grids) through here.
+        """
+        return self._inner
 
     @property
     def current_player(self) -> PlayerId:
