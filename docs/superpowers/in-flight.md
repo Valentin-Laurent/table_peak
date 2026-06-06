@@ -50,4 +50,18 @@ Each entry below describes a feature currently being developed in parallel with 
     - src/table_peak/games/skyjo/state.py
     - src/table_peak/games/skyjo/__init__.py
     - src/table_peak/games/_pyspiel_adapter.py
+- name: quoridor-engine
+  spec_path: docs/superpowers/specs/2026-06-06-quoridor-engine-design.md
+  branch: feature/quoridor-engine
+  worktree_path: TBD
+  status: spec_drafted
+  scope_summary: >
+    Add a 2-player Quoridor engine as a registered OpenSpiel game wrapped through
+    the existing Pyspiel adapter, with conformance-focused tests and no UI or
+    neural-training work in v1.
+  forbidden_zones:
+    - src/table_peak/games/quoridor/**
+    - tests/games/quoridor/**
+    # Shared files this feature may also modify (coordinate before touching):
+    - src/table_peak/games/__init__.py
 ```
