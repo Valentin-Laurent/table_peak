@@ -29,8 +29,8 @@ Each entry below describes a feature currently being developed in parallel with 
 - name: skyjo-web-play
   spec_path: docs/superpowers/specs/2026-06-05-skyjo-web-play-design.md
   branch: feature/skyjo-web-play
-  worktree_path: TBD
-  status: spec_drafted
+  worktree_path: in-place
+  status: dispatched
   scope_summary: >
     Play one full round of Skyjo in the browser (human player 0 vs N Random bots,
     2-8 total). Generalizes the TTT web stack the minimal amount to host a second
