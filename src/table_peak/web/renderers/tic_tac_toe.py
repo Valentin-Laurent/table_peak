@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from table_peak.agents.base import Agent
 from table_peak.games.base import PlayerId
-from table_peak.games.tic_tac_toe import TicTacToeState
 
 _MARK: dict[int, str] = {-1: "", 0: "X", 1: "O"}
 
@@ -20,10 +20,12 @@ class BoardView:
     status: str
     cells_clickable: bool
     game_id: str
+    partial: str = "_board.html"
+    title: str = "Tic-Tac-Toe"
 
 
 def render(
-    state: TicTacToeState,
+    state: Any,
     agents: dict[PlayerId, Agent | None],
     game_id: str,
 ) -> BoardView:

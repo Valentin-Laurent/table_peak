@@ -12,8 +12,7 @@ import secrets
 from dataclasses import dataclass
 
 from table_peak.agents.base import Agent
-from table_peak.games.base import PlayerId
-from table_peak.games.tic_tac_toe import TicTacToeState
+from table_peak.games.base import PlayerId, State
 
 
 @dataclass
@@ -23,12 +22,14 @@ class GameSession:
     `agents[seat] is None` means a human plays that seat. The web adapter
     applies human actions to `state` directly; bots are called via `Agent.act`.
 
+    `game` selects the renderer (and is the key into the renderer registry).
     Mutable by design: `advance_bots` and the web layer replace `state` after
-    each bot move; the `agents` dict is unchanged after construction.
+    each bot move; `agents` and `game` are unchanged after construction.
     """
 
-    state: TicTacToeState
+    state: State
     agents: dict[PlayerId, Agent | None]
+    game: str = "tic_tac_toe"
 
 
 def advance_bots(session: GameSession) -> None:

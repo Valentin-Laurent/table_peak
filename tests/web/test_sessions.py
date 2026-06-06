@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+# mypy helper: cast Protocol-typed session.state back to the concrete TTT type
+# when tests need to access TTT-specific attributes like `.board`.
+from typing import cast as _cast
+
 from table_peak.agents.base import Agent
 from table_peak.agents.minimax import MinimaxAgent
 from table_peak.games.base import PlayerId
@@ -58,7 +62,8 @@ def test_advance_bots_runs_until_human_turn() -> None:
     # After one bot move, current_player switches to O (human) -> stop.
     assert session.state.current_player == 1
     # Exactly one cell on the board is occupied by X.
-    occupied = sum(1 for c in session.state.board if c != -1)
+    ttt_state = _cast(TicTacToeState, session.state)
+    occupied = sum(1 for c in ttt_state.board if c != -1)
     assert occupied == 1
 
 
