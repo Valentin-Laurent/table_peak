@@ -74,11 +74,17 @@ def build_public_view(state: Any, viewer: int) -> SkyjoPublicView:
     is_terminal = phase == Phase.TERMINAL
     scores: dict[int, int] | None = state.round_scores() if is_terminal else None
 
+    # During SETUP_COMMIT the active seat is the committer, not _current_player_index
+    # (which is still -1 until main play). current_player() returns the committer there;
+    # at chance/terminal it returns a negative sentinel, so fall back to the index.
+    cp_raw = int(state.current_player())
+    current_player = cp_raw if cp_raw >= 0 else int(state._current_player_index)
+
     return SkyjoPublicView(
         num_players=int(state._num_players),
         viewer=viewer,
         phase=phase.value,
-        current_player=int(state._current_player_index),
+        current_player=current_player,
         players=tuple(players),
         discard_top=state._discard_pile[-1] if state._discard_pile else None,
         draw_pile_size=int(sum(state._remaining_deck_counts.values())),

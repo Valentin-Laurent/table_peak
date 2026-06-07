@@ -7,29 +7,38 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from table_peak.games.skyjo import actions as sk
 from table_peak.web.app import app, get_store
 from table_peak.web.renderers.skyjo import render
 from table_peak.web.sessions import InMemorySessionStore
-from table_peak.web.skyjo_play import HUMAN_SEAT, new_skyjo_session
+from table_peak.web.skyjo_play import HUMAN_SEAT, advance_bot_setup, new_skyjo_session
 
 
-def test_new_session_drops_into_main_play_with_two_face_up() -> None:
+def test_new_session_starts_human_on_their_setup_reveal() -> None:
     session = new_skyjo_session(num_players=4, seed=1)
     assert session.game == "skyjo"
     assert session.agents[HUMAN_SEAT] is None
     assert len(session.agents) == 4
-    # Bots are NOT fast-forwarded; last_event starts empty.
     assert session.last_event is None
     view = render(session.state, session.agents, "g")
-    # Setup is over (main play), and the human shows exactly two face-up cards.
+    # The human is on their setup turn: 12 face-down cards, each armable as the
+    # first reveal; nothing revealed yet (reveal is deferred to end of setup).
     assert view.is_terminal is False
-    your_face_up = [c for c in view.you.cards if c.label != "?"]
-    assert len(your_face_up) == 2
+    assert view.is_my_turn is True
+    assert len(view.you.cards) == 12
+    assert all(c.label == "?" for c in view.you.cards)
+    assert all(c.arm_to == i for i, c in enumerate(view.you.cards))
 
 
 def test_new_session_is_reproducible_for_a_fixed_seed() -> None:
     a = new_skyjo_session(num_players=3, seed=7)
     b = new_skyjo_session(num_players=3, seed=7)
+    # Both pick the same two reveal slots, then bots finish setup deterministically.
+    reveal = sk.encode_reveal_initial(0, 1)
+    a.state = a.state.apply_action(reveal)
+    b.state = b.state.apply_action(reveal)
+    advance_bot_setup(a)
+    advance_bot_setup(b)
     va = render(a.state, a.agents, "g")
     vb = render(b.state, b.agents, "g")
     assert [c.label for c in va.you.cards] == [c.label for c in vb.you.cards]
@@ -85,7 +94,9 @@ def _step(client: TestClient, game_id: str, html: str) -> str:
     """Advance the game one interaction from the rendered board fragment.
 
     - Bot turn ("Next ▶" present) -> POST /next.
-    - Human in branch-b (cards/flip buttons post name="action") -> post the first.
+    - Human in setup -> arm the first reveal slot, then post the pair.
+    - Human in branch-b with a face-down card -> click it (DiscardAndFlip).
+    - Human in branch-b with no face-down card -> arm the drawn card, then place it.
     - Human at the main-play root -> draw from the deck (no card is clickable yet).
     """
     import re
@@ -97,6 +108,18 @@ def _step(client: TestClient, game_id: str, html: str) -> str:
     matches = re.findall(r'name="action" value="(\d+)"', html)
     if matches:
         r = client.post(f"/games/{game_id}/move", data={"action": matches[0]})
+    elif "reveal_first=" in html:
+        # setup first-pick: arm slot 0, then post the reveal pair.
+        armed_html = client.get(f"/games/{game_id}/board?reveal_first=0").text
+        pair = re.findall(r'name="action" value="(\d+)"', armed_html)
+        assert pair, f"no second-pick target after arming:\n{armed_html[:500]}"
+        r = client.post(f"/games/{game_id}/move", data={"action": pair[0]})
+    elif "armed=drawn" in html:
+        # branch-b, all face-up: arm the drawn card, then place it on a slot.
+        armed_html = client.get(f"/games/{game_id}/board?armed=drawn").text
+        place = re.findall(r'name="action" value="(\d+)"', armed_html)
+        assert place, f"no place target after arming:\n{armed_html[:500]}"
+        r = client.post(f"/games/{game_id}/move", data={"action": place[0]})
     else:
         r = client.post(f"/games/{game_id}/move", data={"action": "78"})  # DrawDeck
     assert r.status_code == 200, r.text

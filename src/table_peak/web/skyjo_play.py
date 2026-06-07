@@ -1,8 +1,10 @@
 """Build a web GameSession for Skyjo: human at seat 0, Random bots elsewhere.
 
-Setup (deal + the blind flip-2) is auto-resolved with random reveals for every
-seat, including the human. Unlike TTT, bots are *not* fast-forwarded: the human
-clicks "Next" to step through one bot turn at a time so every move is visible.
+The deal is auto-resolved by the adapter, dropping the human onto their own
+SETUP_COMMIT turn so they pick which two cards to reveal. Bot setup commits are
+resolved for them (see `advance_bot_setup`). Unlike TTT, bots are *not*
+fast-forwarded in main play: the human clicks "Next" to step through one bot turn
+at a time so every move is visible.
 """
 
 from __future__ import annotations
@@ -25,24 +27,33 @@ def _in_setup(state: Any) -> bool:
     return bool(legal) and all(sk.decode(a).kind == sk.ActionKind.REVEAL_INITIAL for a in legal)
 
 
-def _auto_resolve_setup(state: Any, rng: random.Random) -> Any:
-    while not state.is_terminal and _in_setup(state):
-        state = state.apply_action(rng.choice(list(state.legal_actions())))
-    return state
+def advance_bot_setup(session: GameSession) -> None:
+    """Resolve bot SETUP_COMMIT turns, stopping at the human's setup turn or main play.
+
+    Bots pick their two reveal slots via their own agent. No-op once setup is over
+    (so it is safe to call after every human move).
+    """
+    while not session.state.is_terminal and _in_setup(session.state):
+        seat = session.state.current_player
+        agent = session.agents.get(seat)
+        if agent is None:
+            return
+        session.state = session.state.apply_action(agent.act(session.state))
 
 
 def new_skyjo_session(num_players: int, seed: int = 0) -> GameSession:
     if not 2 <= num_players <= 8:
         raise ValueError(f"num_players must be in [2, 8], got {num_players}")
-    rng = random.Random(seed)
     state = SkyjoGameWrapper(num_players=num_players, seed=seed).new_initial_state()
-    state = _auto_resolve_setup(state, rng)
     agents: dict[PlayerId, Agent | None] = {HUMAN_SEAT: None}
     for p in range(num_players):
         if p != HUMAN_SEAT:
             agents[p] = RandomAgent(random.Random(seed + 1 + p))
-    # No fast-forward: if a bot opens the round, the human steps it via "Next".
-    return GameSession(game="skyjo", state=state, agents=agents)
+    session = GameSession(game="skyjo", state=state, agents=agents)
+    # Human (seat 0) commits first, so this is a no-op today; kept for robustness
+    # if seat order ever changes. Leaves the human on their setup-reveal turn.
+    advance_bot_setup(session)
+    return session
 
 
 def advance_one_bot_turn(session: GameSession) -> None:

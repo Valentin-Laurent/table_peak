@@ -88,25 +88,66 @@ def test_bot_turn_awaits_next_and_carries_last_event() -> None:
     assert view.last_event == "Bot 1 drew from the deck."
 
 
-def test_branch_b_offers_replace_cards_and_flip_buttons() -> None:
+def test_setup_first_pick_arms_each_card() -> None:
+    # A fresh state sits at SETUP_COMMIT with the human (seat 0) to commit first.
+    state = SkyjoGameWrapper(num_players=2, seed=3).new_initial_state()
+    view = render(state, _agents(2), "g1")
+    assert view.is_my_turn is True
+    assert view.reveal_pending is False
+    assert len(view.you.cards) == 12
+    # Nothing revealed yet; every card is an arm-the-first-reveal source (GET), not a move.
+    for slot, card in enumerate(view.you.cards):
+        assert card.label == "?"
+        assert card.clickable is False
+        assert card.arm_to == slot
+    assert "reveal" in view.status.lower()
+
+
+def test_setup_second_pick_posts_reveal_initial() -> None:
+    state = SkyjoGameWrapper(num_players=2, seed=3).new_initial_state()
+    view = render(state, _agents(2), "g1", reveal_first=2)
+    assert view.reveal_pending is True
+    for slot, card in enumerate(view.you.cards):
+        if slot == 2:
+            assert card.selected is True
+            assert card.clickable is False
+        else:
+            assert card.clickable is True
+            assert card.action == sk.encode_reveal_initial(2, slot)
+
+
+def test_branch_b_unarmed_flips_face_down_cards_and_drawn_card_arms() -> None:
     state = _to_human_turn(num_players=2, seed=3)
     state = state.apply_action(sk.encode_draw_deck())
     view = render(state, _agents(2), "g1")
     assert view.draw_pile_clickable is False
     assert view.drawn_card is not None
-    # Cards post replace-from-hand.
+    assert view.armed is False
+    # The drawn card is the "arm to keep it" source.
+    assert view.drawn_clickable is True
+    # Unarmed: clicking a face-down card discards the drawn card to reveal it;
+    # face-up cards are not clickable (no reveal possible without arming).
+    flipped_any = False
+    for slot, card in enumerate(view.you.cards):
+        if card.label == "?":
+            assert card.clickable is True
+            assert card.action == sk.encode_discard_and_flip(slot)
+            flipped_any = True
+        else:
+            assert card.clickable is False
+    assert flipped_any
+
+
+def test_branch_b_armed_places_drawn_card_on_any_slot() -> None:
+    state = _to_human_turn(num_players=2, seed=3)
+    state = state.apply_action(sk.encode_draw_deck())
+    view = render(state, _agents(2), "g1", armed=True)
+    assert view.armed is True
+    assert view.drawn_clickable is False
+    # Armed: every slot becomes a place target posting replace-from-hand.
     for slot, card in enumerate(view.you.cards):
         assert card.clickable is True
         assert card.action == sk.encode_replace_from_hand(slot)
-    # There is one flip button per face-down slot, posting discard-and-flip.
-    flip_slots = {fb.slot for fb in view.flip_buttons}
-    assert len(view.flip_buttons) >= 1
-    for fb in view.flip_buttons:
-        assert fb.action == sk.encode_discard_and_flip(fb.slot)
-    # Flip buttons target only currently-hidden slots.
-    for slot, card in enumerate(view.you.cards):
-        if card.label != "?":
-            assert slot not in flip_slots
 
 
 def test_terminal_shows_sorted_scores_and_no_clickable_cards() -> None:

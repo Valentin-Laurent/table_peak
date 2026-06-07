@@ -8,20 +8,21 @@
         .turns .arrow { opacity: .5; }
         .opps { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 12px; }
         .panel { border: 1px solid #39414f; border-radius: 8px; padding: 8px; }
-        .panel.you { border-color: #4f9d5b; display: inline-block; }
+        .panel.you { border-color: #4f9d5b; display: block; width: fit-content; margin: 0 auto; }
         .panel .tag { font-size: 11px; opacity: .8; margin-bottom: 4px; }
         .sgrid { display: grid; gap: 3px; }
         .card { width: 40px; height: 52px; border-radius: 5px; display: flex; align-items: center;
                 justify-content: center; font-weight: 700; color: #fff; border: none; font-size: 14px; }
         .card.mini { width: 26px; height: 34px; font-size: 10px; }
         button.card, .pile.clickable { cursor: pointer; }
+        .card.sel { outline: 3px solid #fff; outline-offset: 1px; }
         .pile.clickable { outline: 2px solid #4f9d5b; outline-offset: 2px; border-radius: 6px; }
         .fd { background: #5b6472; color: #aeb6c2; } .neg { background: #3b6fb0; }
         .zero { background: #8a93a2; } .lo { background: #4f9d5b; }
         .mid { background: #d9a23b; } .hi { background: #c0504d; }
         .piles { display: flex; gap: 16px; justify-content: center; align-items: center; margin: 10px 0; }
         .pile { text-align: center; }
-        .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+        .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 8px; }
         .status { font-size: 1.1rem; margin: 8px 0; }
         .event { font-size: .95rem; color: #d9a23b; margin: 4px 0; min-height: 1.2em; }
         table.scores { margin: 8px 0; border-collapse: collapse; }
@@ -75,7 +76,11 @@
                 <div class="tag">discard</div>
             </div>
             {% if view.drawn_card is not none %}
-            <div class="pile">
+            <div class="pile {% if view.drawn_clickable %}clickable{% endif %}"
+                 {% if view.drawn_clickable %}
+                 hx-get="/games/{{ view.game_id }}/board?armed=drawn"
+                 hx-target="#board" hx-swap="outerHTML"
+                 {% endif %}>
                 <span class="card {{ view.drawn_css }}">{{ view.drawn_card }}</span>
                 <div class="tag">drawn</div>
             </div>
@@ -86,13 +91,17 @@
             <div class="tag">{{ view.you.label }} · sum {{ view.you.face_up_sum }}{% if view.you.is_current %} · ▶{% endif %}</div>
             <div class="sgrid" style="grid-template-columns: repeat({{ view.you.num_columns }}, 44px);">
                 {% for card in view.you.cards %}
-                    {% if card.clickable %}
+                    {% if card.action >= 0 %}
                     <form hx-post="/games/{{ view.game_id }}/move" hx-target="#board" hx-swap="outerHTML"
                           style="display:contents;">
-                        <button type="submit" class="card {{ card.css }}" name="action" value="{{ card.action }}">{{ card.label }}</button>
+                        <button type="submit" class="card {{ card.css }}{% if card.selected %} sel{% endif %}" name="action" value="{{ card.action }}">{{ card.label }}</button>
                     </form>
+                    {% elif card.arm_to >= 0 %}
+                    <button type="button" class="card {{ card.css }}"
+                            hx-get="/games/{{ view.game_id }}/board?reveal_first={{ card.arm_to }}"
+                            hx-target="#board" hx-swap="outerHTML">{{ card.label }}</button>
                     {% else %}
-                    <span class="card {{ card.css }}">{{ card.label }}</span>
+                    <span class="card {{ card.css }}{% if card.selected %} sel{% endif %}">{{ card.label }}</span>
                     {% endif %}
                 {% endfor %}
             </div>
@@ -105,7 +114,7 @@
                 <button type="submit">Next ▶</button>
             </form>
             {% endif %}
-            {% if view.armed %}
+            {% if view.armed or view.reveal_pending %}
             <a href="#" hx-get="/games/{{ view.game_id }}/board" hx-target="#board" hx-swap="outerHTML">cancel</a>
             {% endif %}
             {% if view.flip_buttons %}
