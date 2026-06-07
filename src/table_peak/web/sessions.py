@@ -30,6 +30,7 @@ class GameSession:
     state: State
     agents: dict[PlayerId, Agent | None]
     game: str = "tic_tac_toe"
+    last_event: str | None = None
 
 
 def advance_bots(session: GameSession) -> None:

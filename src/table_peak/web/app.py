@@ -15,8 +15,9 @@ from table_peak.games.base import PlayerId
 from table_peak.games.tic_tac_toe import TicTacToe
 from table_peak.web.agents import AGENT_REGISTRY
 from table_peak.web.renderers import RENDERERS
+from table_peak.web.renderers import skyjo as skyjo_renderer
 from table_peak.web.sessions import GameSession, InMemorySessionStore, advance_bots
-from table_peak.web.skyjo_play import new_skyjo_session
+from table_peak.web.skyjo_play import advance_one_bot_turn, new_skyjo_session
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
@@ -41,7 +42,15 @@ def _build_agent(name: str) -> Agent | None:
     return factory()
 
 
-def _render(session: GameSession, game_id: str) -> Any:
+def _render(session: GameSession, game_id: str, *, armed: bool = False) -> Any:
+    if session.game == "skyjo":
+        return skyjo_renderer.render(
+            session.state,
+            session.agents,
+            game_id,
+            armed=armed,
+            last_event=session.last_event,
+        )
     render_fn = RENDERERS.get(session.game)
     if render_fn is None:
         raise HTTPException(status_code=500, detail=f"No renderer for game: {session.game}")
@@ -90,8 +99,10 @@ def game_page(
     session = store.get(game_id)
     if session is None:
         raise HTTPException(status_code=404)
-    advance_bots(session)
-    store.save(game_id, session)
+    # Skyjo steps bots one turn at a time via the "Next" button; TTT fast-forwards.
+    if session.game != "skyjo":
+        advance_bots(session)
+        store.save(game_id, session)
     view = _render(session, game_id)
     return templates.TemplateResponse(request, "game.html", {"view": view})
 
@@ -113,8 +124,44 @@ def submit_move(
     if action not in session.state.legal_actions():
         raise HTTPException(status_code=400, detail=f"Illegal action: {action}")
     session.state = session.state.apply_action(action)
-    advance_bots(session)
+    if session.game != "skyjo":
+        advance_bots(session)
+    else:
+        session.last_event = None  # a human move clears the stale bot note
     store.save(game_id, session)
     view = _render(session, game_id)
     partial = view.partial
     return templates.TemplateResponse(request, partial, {"view": view})
+
+
+@app.post("/games/{game_id}/next", response_class=HTMLResponse)
+def next_turn(
+    game_id: str,
+    request: Request,
+    store: Annotated[InMemorySessionStore, Depends(get_store)],
+) -> HTMLResponse:
+    session = store.get(game_id)
+    if session is None:
+        raise HTTPException(status_code=404)
+    if session.state.is_terminal:
+        raise HTTPException(status_code=409, detail="Game is over")
+    if session.agents[session.state.current_player] is None:
+        raise HTTPException(status_code=409, detail="It is your turn")
+    advance_one_bot_turn(session)
+    store.save(game_id, session)
+    view = _render(session, game_id)
+    return templates.TemplateResponse(request, view.partial, {"view": view})
+
+
+@app.get("/games/{game_id}/board", response_class=HTMLResponse)
+def board_fragment(
+    game_id: str,
+    request: Request,
+    store: Annotated[InMemorySessionStore, Depends(get_store)],
+    armed: str | None = None,
+) -> HTMLResponse:
+    session = store.get(game_id)
+    if session is None:
+        raise HTTPException(status_code=404)
+    view = _render(session, game_id, armed=(armed == "discard"))
+    return templates.TemplateResponse(request, view.partial, {"view": view})

@@ -1,10 +1,12 @@
 """Render a Skyjo state (PyspielStateAdapter) into a template-friendly view.
 
-The human is the seat whose agent is None. Each human card/button carries the
-engine action integer it posts:
-  - main-play root : click a card -> TakeDiscardAndReplace(slot); plus a Draw button.
+The human is the seat whose agent is None. Interaction model (Skyjo-only):
+  - main-play root : click the *draw pile* -> DrawDeck, or click the *discard
+                     pile* to "arm" place-mode; armed, each card click posts
+                     TakeDiscardAndReplace(slot).
   - branch-b       : click a card -> ReplaceFromHand(slot); plus per-face-down-slot
-                     DiscardAndFlip buttons (the disambiguation the spec calls out).
+                     DiscardAndFlip buttons.
+  - bot turn       : no human controls; a "Next" button steps one bot turn.
 Opponent cards are never clickable. Hidden values render as "?".
 """
 
@@ -49,19 +51,31 @@ class FlipButton:
 
 
 @dataclass(frozen=True, slots=True)
+class TurnSlot:
+    label: str
+    is_current: bool
+
+
+@dataclass(frozen=True, slots=True)
 class SkyjoBoardView:
     partial: str
     title: str
     game_id: str
     status: str
     is_terminal: bool
+    is_my_turn: bool
+    awaiting_bot: bool
+    last_event: str | None
+    turn_order: tuple[TurnSlot, ...]
     you: SkyjoPanel
     opponents: tuple[SkyjoPanel, ...]
     discard_top: int | None
     discard_css: str
+    discard_clickable: bool
     draw_pile_size: int
-    can_draw: bool
+    draw_pile_clickable: bool
     draw_action: int
+    armed: bool
     drawn_card: int | None
     drawn_css: str
     flip_buttons: tuple[FlipButton, ...]
@@ -120,10 +134,12 @@ def _static_cards(pv: SkyjoPublicView, seat: int) -> tuple[SkyjoCard, ...]:
     )
 
 
-def _human_cards(pv: SkyjoPublicView, seat: int, your_turn: bool) -> tuple[SkyjoCard, ...]:
+def _human_cards(
+    pv: SkyjoPublicView, seat: int, your_turn: bool, armed: bool
+) -> tuple[SkyjoCard, ...]:
     cards: list[SkyjoCard] = []
     for slot, c in enumerate(pv.players[seat].cells):
-        if your_turn and pv.phase == "main_play":
+        if your_turn and pv.phase == "main_play" and armed:
             action = sk.encode_take_discard_and_replace(slot)
             clickable = True
         elif your_turn and pv.phase == "branch_b_subaction":
@@ -149,7 +165,7 @@ def _final_scores(pv: SkyjoPublicView, human_seat: int) -> tuple[tuple[str, int]
     return tuple((_seat_label(seat, human_seat), score) for seat, score in ordered)
 
 
-def _status(pv: SkyjoPublicView, human_seat: int) -> str:
+def _status(pv: SkyjoPublicView, human_seat: int, your_turn: bool, armed: bool) -> str:
     if pv.is_terminal:
         assert pv.scores is not None
         your = pv.scores[human_seat]
@@ -158,34 +174,47 @@ def _status(pv: SkyjoPublicView, human_seat: int) -> str:
         if winners == [human_seat]:
             return f"Round over — you won with {your}."
         return f"Round over — you scored {your}; lowest score wins."
-    if pv.phase == "main_play":
-        return (
-            f"Your turn — click a card to take the discard ({pv.discard_top}),"
-            " or draw from the deck."
-        )
+    if not your_turn:
+        return f"Bot {pv.current_player}'s turn — click Next to play it out."
     if pv.phase == "branch_b_subaction":
         return (
             f"You drew {pv.drawn_card} — click a card to keep it there,"
             " or discard & flip a hidden card."
         )
-    return "Waiting…"
+    if armed:
+        return f"Click one of your cards to swap it for the discard ({pv.discard_top}), or cancel."
+    return "Your turn — click the draw pile to draw, or the discard pile to take its top card."
 
 
 def render(
     state: Any,
     agents: dict[PlayerId, Agent | None],
     game_id: str,
+    *,
+    armed: bool = False,
+    last_event: str | None = None,
 ) -> SkyjoBoardView:
     assert isinstance(state, PyspielStateAdapter)
     human_seat = _human_seat(agents)
     pv = build_public_view(state.inner, viewer=human_seat)
     your_turn = (not pv.is_terminal) and pv.current_player == human_seat
+    awaiting_bot = (not pv.is_terminal) and not your_turn
+    # "armed" only means anything on the human's own main-play turn.
+    armed = armed and your_turn and pv.phase == "main_play"
 
-    you = _panel(pv, human_seat, human_seat, _human_cards(pv, human_seat, your_turn))
+    you = _panel(pv, human_seat, human_seat, _human_cards(pv, human_seat, your_turn, armed))
     opponents = tuple(
         _panel(pv, seat, human_seat, _static_cards(pv, seat))
         for seat in range(pv.num_players)
         if seat != human_seat
+    )
+
+    turn_order = tuple(
+        TurnSlot(
+            label=_seat_label(seat, human_seat),
+            is_current=(not pv.is_terminal) and seat == pv.current_player,
+        )
+        for seat in range(pv.num_players)
     )
 
     flip_buttons: tuple[FlipButton, ...] = ()
@@ -196,19 +225,26 @@ def render(
             if not c.face_up
         )
 
+    in_root = your_turn and pv.phase == "main_play"
     return SkyjoBoardView(
         partial=PARTIAL,
         title=TITLE,
         game_id=game_id,
-        status=_status(pv, human_seat),
+        status=_status(pv, human_seat, your_turn, armed),
         is_terminal=pv.is_terminal,
+        is_my_turn=your_turn,
+        awaiting_bot=awaiting_bot,
+        last_event=last_event,
+        turn_order=turn_order,
         you=you,
         opponents=opponents,
         discard_top=pv.discard_top,
         discard_css=_css(pv.discard_top),
+        discard_clickable=in_root and not armed and pv.discard_top is not None,
         draw_pile_size=pv.draw_pile_size,
-        can_draw=(your_turn and pv.phase == "main_play"),
+        draw_pile_clickable=in_root and not armed,
         draw_action=sk.encode_draw_deck(),
+        armed=armed,
         drawn_card=pv.drawn_card,
         drawn_css=_css(pv.drawn_card),
         flip_buttons=flip_buttons,

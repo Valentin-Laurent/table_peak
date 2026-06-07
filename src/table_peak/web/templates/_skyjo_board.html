@@ -1,33 +1,50 @@
 <div id="board">
     <style>
         .skyjo { font-family: system-ui, sans-serif; }
+        .turns { display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+                 font-size: 12px; margin-bottom: 10px; }
+        .turns .seat { padding: 2px 8px; border-radius: 12px; background: #2b323d; color: #aeb6c2; }
+        .turns .seat.cur { background: #4f9d5b; color: #fff; font-weight: 700; }
+        .turns .arrow { opacity: .5; }
         .opps { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 12px; }
         .panel { border: 1px solid #39414f; border-radius: 8px; padding: 8px; }
-        .panel.you { border-color: #4f9d5b; }
+        .panel.you { border-color: #4f9d5b; display: inline-block; }
         .panel .tag { font-size: 11px; opacity: .8; margin-bottom: 4px; }
         .sgrid { display: grid; gap: 3px; }
         .card { width: 40px; height: 52px; border-radius: 5px; display: flex; align-items: center;
                 justify-content: center; font-weight: 700; color: #fff; border: none; font-size: 14px; }
         .card.mini { width: 26px; height: 34px; font-size: 10px; }
-        button.card { cursor: pointer; }
+        button.card, .pile.clickable { cursor: pointer; }
+        .pile.clickable { outline: 2px solid #4f9d5b; outline-offset: 2px; border-radius: 6px; }
         .fd { background: #5b6472; color: #aeb6c2; } .neg { background: #3b6fb0; }
         .zero { background: #8a93a2; } .lo { background: #4f9d5b; }
         .mid { background: #d9a23b; } .hi { background: #c0504d; }
         .piles { display: flex; gap: 16px; justify-content: center; align-items: center; margin: 10px 0; }
+        .pile { text-align: center; }
         .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
         .status { font-size: 1.1rem; margin: 8px 0; }
+        .event { font-size: .95rem; color: #d9a23b; margin: 4px 0; min-height: 1.2em; }
         table.scores { margin: 8px 0; border-collapse: collapse; }
         table.scores td { border: 1px solid #ccc; padding: 2px 10px; }
     </style>
 
     <div class="skyjo">
+        <div class="turns">
+            <span>Turn order:</span>
+            {% for t in view.turn_order %}
+            <span class="seat {% if t.is_current %}cur{% endif %}">{{ t.label }}</span>
+            {% if not loop.last %}<span class="arrow">→</span>{% endif %}
+            {% endfor %}
+        </div>
+
         <p class="status">{{ view.status }}</p>
+        <p class="event">{% if view.last_event %}{{ view.last_event }}{% endif %}</p>
 
         <div class="opps">
             {% for opp in view.opponents %}
             <div class="panel">
                 <div class="tag">{{ opp.label }} · sum {{ opp.face_up_sum }}{% if opp.is_current %} · ▶{% endif %}</div>
-                <div class="sgrid" style="grid-template-columns: repeat({{ opp.num_columns }}, 1fr);">
+                <div class="sgrid" style="grid-template-columns: repeat({{ opp.num_columns }}, 26px);">
                     {% for card in opp.cards %}
                     <span class="card mini {{ card.css }}">{{ card.label }}</span>
                     {% endfor %}
@@ -37,11 +54,19 @@
         </div>
 
         <div class="piles">
-            <div style="text-align:center;">
+            <div class="pile {% if view.draw_pile_clickable %}clickable{% endif %}"
+                 {% if view.draw_pile_clickable %}
+                 hx-post="/games/{{ view.game_id }}/move" hx-vals='{"action": {{ view.draw_action }}}'
+                 hx-target="#board" hx-swap="outerHTML"
+                 {% endif %}>
                 <span class="card fd">{{ view.draw_pile_size }}</span>
                 <div class="tag">draw</div>
             </div>
-            <div style="text-align:center;">
+            <div class="pile {% if view.discard_clickable %}clickable{% endif %}"
+                 {% if view.discard_clickable %}
+                 hx-get="/games/{{ view.game_id }}/board?armed=discard"
+                 hx-target="#board" hx-swap="outerHTML"
+                 {% endif %}>
                 {% if view.discard_top is not none %}
                 <span class="card {{ view.discard_css }}">{{ view.discard_top }}</span>
                 {% else %}
@@ -50,7 +75,7 @@
                 <div class="tag">discard</div>
             </div>
             {% if view.drawn_card is not none %}
-            <div style="text-align:center;">
+            <div class="pile">
                 <span class="card {{ view.drawn_css }}">{{ view.drawn_card }}</span>
                 <div class="tag">drawn</div>
             </div>
@@ -59,7 +84,7 @@
 
         <div class="panel you">
             <div class="tag">{{ view.you.label }} · sum {{ view.you.face_up_sum }}{% if view.you.is_current %} · ▶{% endif %}</div>
-            <div class="sgrid" style="grid-template-columns: repeat({{ view.you.num_columns }}, 1fr);">
+            <div class="sgrid" style="grid-template-columns: repeat({{ view.you.num_columns }}, 44px);">
                 {% for card in view.you.cards %}
                     {% if card.clickable %}
                     <form hx-post="/games/{{ view.game_id }}/move" hx-target="#board" hx-swap="outerHTML"
@@ -75,10 +100,13 @@
 
         {% if not view.is_terminal %}
         <div class="controls">
-            {% if view.can_draw %}
-            <form hx-post="/games/{{ view.game_id }}/move" hx-target="#board" hx-swap="outerHTML">
-                <button type="submit" name="action" value="{{ view.draw_action }}">Draw from deck</button>
+            {% if view.awaiting_bot %}
+            <form hx-post="/games/{{ view.game_id }}/next" hx-target="#board" hx-swap="outerHTML">
+                <button type="submit">Next ▶</button>
             </form>
+            {% endif %}
+            {% if view.armed %}
+            <a href="#" hx-get="/games/{{ view.game_id }}/board" hx-target="#board" hx-swap="outerHTML">cancel</a>
             {% endif %}
             {% if view.flip_buttons %}
             <span>Discard {{ view.drawn_card }} &amp; flip:</span>

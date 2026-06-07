@@ -13,15 +13,16 @@ from table_peak.web.sessions import InMemorySessionStore
 from table_peak.web.skyjo_play import HUMAN_SEAT, new_skyjo_session
 
 
-def test_new_session_drops_human_into_main_play_with_two_face_up() -> None:
+def test_new_session_drops_into_main_play_with_two_face_up() -> None:
     session = new_skyjo_session(num_players=4, seed=1)
     assert session.game == "skyjo"
     assert session.agents[HUMAN_SEAT] is None
     assert len(session.agents) == 4
+    # Bots are NOT fast-forwarded; last_event starts empty.
+    assert session.last_event is None
     view = render(session.state, session.agents, "g")
-    # Setup is over: the human can either take-discard or draw.
+    # Setup is over (main play), and the human shows exactly two face-up cards.
     assert view.is_terminal is False
-    assert view.can_draw is True
     your_face_up = [c for c in view.you.cards if c.label != "?"]
     assert len(your_face_up) == 2
 
@@ -76,21 +77,28 @@ def test_create_skyjo_game_renders_board(client: TestClient) -> None:
     assert r.status_code == 200
     assert r.text.count("Skyjo") >= 1
     assert 'id="board"' in r.text
-    # The human is on a main-play turn: the Draw button is present.
-    assert "Draw from deck" in r.text
+    # The turn-order strip is always shown for Skyjo.
+    assert "Turn order:" in r.text
 
 
-def _post_first_legal_human_action(client: TestClient, game_id: str, html: str) -> str:
-    """Parse the board fragment, post the first legal human action, return new html.
+def _step(client: TestClient, game_id: str, html: str) -> str:
+    """Advance the game one interaction from the rendered board fragment.
 
-    The renderer puts each legal action in `name="action" value="N"`. We pick the
-    first one (any legal move keeps the round progressing toward terminal)."""
+    - Bot turn ("Next ▶" present) -> POST /next.
+    - Human in branch-b (cards/flip buttons post name="action") -> post the first.
+    - Human at the main-play root -> draw from the deck (no card is clickable yet).
+    """
     import re
 
+    if "Next ▶" in html:
+        r = client.post(f"/games/{game_id}/next")
+        assert r.status_code == 200, r.text
+        return str(r.text)
     matches = re.findall(r'name="action" value="(\d+)"', html)
-    assert matches, f"no clickable action in board:\n{html[:500]}"
-    action = matches[0]
-    r = client.post(f"/games/{game_id}/move", data={"action": action})
+    if matches:
+        r = client.post(f"/games/{game_id}/move", data={"action": matches[0]})
+    else:
+        r = client.post(f"/games/{game_id}/move", data={"action": "78"})  # DrawDeck
     assert r.status_code == 200, r.text
     return str(r.text)
 
@@ -104,12 +112,12 @@ def test_full_round_playthrough_reaches_terminal_with_scores(client: TestClient)
     game_id = str(r.headers["location"]).rsplit("/", 1)[-1]
     html = client.get(f"/games/{game_id}").text
 
-    # Drive the human by always taking the first offered legal action. The round
-    # is finite, so this terminates. Cap iterations as a safety net.
-    for _ in range(500):
+    # Step through the round: click Next on bot turns, draw + place on human turns.
+    # The round is finite, so this terminates. Cap iterations as a safety net.
+    for _ in range(2000):
         if "Round over" in html:
             break
-        html = _post_first_legal_human_action(client, game_id, html)
+        html = _step(client, game_id, html)
     assert "Round over" in html
     # The score table is present (one row per player => at least two <td> score cells).
     assert html.count("</td>") >= 4
