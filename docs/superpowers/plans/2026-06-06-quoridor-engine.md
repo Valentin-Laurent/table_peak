@@ -734,6 +734,36 @@ class QuoridorState(pyspiel.State):  # type: ignore[misc]
         if self._winner is None:
             return [0.0, 0.0]
         return [1.0, -1.0] if self._winner == 0 else [-1.0, 1.0]
+
+    def clone(self) -> QuoridorState:
+        """Deep copy for pyspiel tree expansion.
+
+        copy.deepcopy does NOT work for pybind11-trampoline pyspiel states: the
+        C++->Python link is lost, so a later apply_action on the copy mutates a
+        throwaway instance rather than the clone (this bit us on Skyjo). We rebuild
+        by replaying the action history through the normal apply path, which
+        preserves the trampoline linkage. Quoridor is deterministic (no chance
+        nodes), so the replay is exact.
+
+        The wrapper layer relies on this: PyspielStateAdapter.apply_action calls
+        inner.clone() on every move, so an engine without clone() fails the Task 5
+        conformance tests.
+        """
+        fresh: QuoridorState = self.get_game().new_initial_state()
+        for action in self.history():
+            fresh.apply_action(action)
+        return fresh
+
+    def __str__(self) -> str:
+        """God's-eye state string (pyspiel's State::ToString), a required virtual."""
+        return (
+            f"player={self._current_player_index} "
+            f"p0={self._pawn_positions[0].col},{self._pawn_positions[0].row} "
+            f"p1={self._pawn_positions[1].col},{self._pawn_positions[1].row} "
+            f"walls0={self._walls_remaining[0]} walls1={self._walls_remaining[1]} "
+            f"H={sorted((a.col, a.row) for a in self._horizontal_walls)} "
+            f"V={sorted((a.col, a.row) for a in self._vertical_walls)}"
+        )
 ```
 
 Replace `src/table_peak/games/quoridor/__init__.py` with:
@@ -778,9 +808,26 @@ from __future__ import annotations
 
 import random
 
+import pyspiel  # type: ignore[import-not-found]
+
+import table_peak.games.quoridor  # noqa: F401  (registers the game)
 from table_peak.agents.random import RandomAgent
 from table_peak.games.quoridor import QuoridorGameWrapper
+from table_peak.games.quoridor.actions import encode_move
+from table_peak.games.quoridor.geometry import Cell
 from table_peak.runner.play import play_game, play_matches
+
+
+def test_clone_is_independent_of_original() -> None:
+    # Regression guard: the adapter calls inner.clone() on every apply_action,
+    # and deepcopy silently breaks pyspiel trampoline states. A move on the clone
+    # must not leak back into the original.
+    game = pyspiel.load_game("quoridor", {"seed": 0})
+    state = game.new_initial_state()
+    clone = state.clone()
+    clone.apply_action(encode_move(Cell(col=4, row=1)))
+    assert state.current_player() == 0
+    assert encode_move(Cell(col=4, row=1)) in set(state.legal_actions())
 
 
 def test_play_game_runs_to_terminal() -> None:
@@ -865,3 +912,4 @@ git commit -m "test(quoridor): add wrapper and conformance coverage"
 - **Spec coverage:** this plan covers codec/constants, wall legality/path condition, pawn movement/jumps, registered-game/state wiring, wrapper compatibility, and repo-level verification.
 - **Placeholder scan:** no `TBD`, `TODO`, or “similar to Task N” references remain.
 - **Type consistency:** `Cell`, `WallAnchor`, `Orientation`, `encode_move`, `encode_wall`, `decode`, `legal_pawn_destinations`, `is_wall_legal`, `QuoridorState`, and `QuoridorGameWrapper` are used consistently across tasks.
+- **pyspiel trampoline virtuals (validated against `SkyjoState`):** `QuoridorState` implements `clone()` (history-replay, not deepcopy) and `__str__()`. The adapter (`_pyspiel_adapter.py:48`) calls `inner.clone()` on every `apply_action`, so omitting `clone()` would fail the Task 5 wrapper tests; an explicit `test_clone_is_independent_of_original` guards it. `is_chance_node`/`chance_outcomes` are intentionally not overridden — Quoridor is deterministic, so the C++ defaults (driven by `current_player`) are correct.
