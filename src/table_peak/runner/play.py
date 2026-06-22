@@ -19,8 +19,17 @@ class Outcome:
     num_moves: int
 
 
-def play_game(game: Game, agents: Mapping[PlayerId, Agent]) -> Outcome:
-    """Run one game to completion and return its outcome."""
+def play_game(
+    game: Game, agents: Mapping[PlayerId, Agent], max_moves: int | None = None
+) -> Outcome:
+    """Run one game and return its outcome.
+
+    Runs to a terminal state by default. `max_moves` is an optional safety cap:
+    when set, the game stops after that many moves even if not terminal, and the
+    returns reflect the (possibly non-terminal) stopping state. This keeps tests
+    and tooling from hanging on games that can take very long to terminate (e.g.
+    random self-play in games with no natural move limit).
+    """
     if set(agents.keys()) != set(range(game.num_players)):
         raise ValueError(
             f"agents keys {sorted(agents.keys())} must equal "
@@ -29,7 +38,7 @@ def play_game(game: Game, agents: Mapping[PlayerId, Agent]) -> Outcome:
 
     state = game.new_initial_state()
     history: list[tuple[State, Action]] = []
-    while not state.is_terminal:
+    while not state.is_terminal and (max_moves is None or len(history) < max_moves):
         player = state.current_player
         action = agents[player].act(state)
         history.append((state, action))
@@ -60,6 +69,7 @@ def play_matches(
     n: int,
     swap_sides: bool = True,
     seed: int | None = None,
+    max_moves: int | None = None,
 ) -> MatchStats:
     """Play `n` games between two agents and aggregate outcomes.
 
@@ -91,7 +101,7 @@ def play_matches(
         # added later, so existing seeded tests don't all need re-baselining.
         _ = rng.random()
 
-        outcome = play_game(game, agents)
+        outcome = play_game(game, agents, max_moves=max_moves)
 
         a_return = outcome.returns[agent_seat[0]]
         b_return = outcome.returns[agent_seat[1]]
