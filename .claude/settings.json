@@ -1,6 +1,6 @@
 {
   "enabledPlugins": {
-    "superpowers@claude-plugins-official": true
+    "beads-superpowers@beads-superpowers-marketplace": true
   },
   "hooks": {
     "SessionStart": [

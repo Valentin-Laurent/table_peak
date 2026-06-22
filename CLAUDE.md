@@ -1,8 +1,3 @@
-# table_peak
-
-This project uses parallel-feature-development; see docs/superpowers/in-flight.md for currently in-flight work.
-
-
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:6cd5cc61 -->
 ## Beads Issue Tracker
 
