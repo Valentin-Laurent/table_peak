@@ -15,9 +15,7 @@ Project goals:
 
 ## Roadmap
 
-In progress: see [`docs/superpowers/in-flight.md`](docs/superpowers/in-flight.md)
-
-Next: who knows?
+In progress: {insert link to beads tasks here?}
 
 **Suggest a game** — game designers and creators, please open an issue with
 the rules and player count; I'd love to add more games.
@@ -42,8 +40,10 @@ training entry point is `table_peak.training.loop.train`.
 Tooling: `pdm`, `ruff`, `mypy --strict`, `pytest`, `pre-commit` — config in
 [`pyproject.toml`](pyproject.toml) and
 [`.pre-commit-config.yaml`](.pre-commit-config.yaml). Work follows the
-superpowers workflow (brainstorm → spec → plan → implement) under
-[`docs/superpowers/`](docs/superpowers/).
+[beads-superpowers](https://github.com/obra/superpowers) workflow
+(brainstorm → spec → plan → implement) under
+[`docs/superpowers/`](docs/superpowers/), with task tracking in
+[beads](https://github.com/gastownhall/beads) (`bd`).
 
 ## License
 
