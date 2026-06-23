@@ -14,5 +14,18 @@
         "matcher": ""
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(make:*)",
+      "Bash(pdm:*)",
+      "Bash(rtk git:*)"
+    ],
+    "deny": [
+      "Edit(./Makefile)",
+      "Write(./Makefile)",
+      "Edit(./**/Makefile)",
+      "Write(./**/Makefile)"
+    ]
   }
 }
