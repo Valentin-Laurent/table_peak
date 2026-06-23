@@ -59,6 +59,12 @@ dolt-pprof/
 # Backup data (auto-exported JSONL, local-only)
 backup/
 
+# Auto-exported JSONL (export.auto: true regenerates these constantly).
+# Canonical sync is the Dolt remote (sync.remote in config.yaml) via the
+# pre-push hook, so these passive exports are local-only to avoid churn.
+issues.jsonl
+interactions.jsonl
+
 # Per-project environment file (Dolt connection config, GH#2520)
 .env
 
