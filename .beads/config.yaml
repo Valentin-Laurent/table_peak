@@ -68,3 +68,5 @@
 sync.remote: "git+https://github.com/Valentin-Laurent/table_peak.git"
 
 export.auto: true
+
+sync.auto-push: true
