@@ -52,3 +52,11 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - Do not commit or push without clear authority from the active profile or the current user request.
 - If a required sync or push is blocked, stop and report the exact command and error.
 <!-- END BEADS INTEGRATION -->
+
+## Beads sync (project-specific)
+
+Beads sync rides on `git push`: the installed `pre-push` git hook (`bd hooks install`) runs `bd dolt push` automatically, so the Dolt remote stays in step with your code pushes — no separate sync command to remember. Run `bd hooks list` to confirm the hooks are installed (re-run `bd hooks install` if not).
+
+The `.beads/issues.jsonl` and `interactions.jsonl` exports are gitignored: they are passive, locally-regenerated snapshots (`export.auto: true`). The Dolt remote is the source of truth; do not commit the JSONL.
+
+Under the Claude Code sandbox, agents can't reach the GitHub remote, so `bd dolt push` / `git push` must be run by the human (e.g. `! git push`, which also triggers the hook).
