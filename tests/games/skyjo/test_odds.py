@@ -84,3 +84,24 @@ def test_pool_size_invariant_holds():
     pool = _expected_pool(state)
 
     assert sum(pool.values()) == draw_pile_size + face_down
+
+
+def test_empty_draw_pile_uses_recycled_discard_minus_top():
+    # Build a real MAIN_PLAY state via the suite helper, then (Arrange step only)
+    # force an empty draw pile and a known discard pile. draw_odds still reads only
+    # public size + discard, so this stays black-box at the API boundary.
+    state = make_main_play_state()
+    state._remaining_deck_counts = Counter()
+    state._discard_pile = [3, 3, 7, 1]  # 1 is the top
+
+    assert sum(state._remaining_deck_counts.values()) == 0
+
+    recycled = Counter(state._discard_pile[:-1])  # everything but the top -> {3:2, 7:1}
+    total = sum(recycled.values())
+
+    odds = draw_odds(state)
+
+    assert odds.pmf.keys() == set(recycled.keys())
+    for value, count in recycled.items():
+        assert odds.pmf[value] == pytest.approx(count / total)
+    assert sum(odds.pmf.values()) == pytest.approx(1.0)

@@ -63,7 +63,20 @@ def draw_odds(state: SkyjoState) -> DrawOdds:
     over the unseen pool (draw pile + face-down grid cells): a player cannot
     distinguish a draw-pile card from a face-down grid card, so by exchangeability
     the marginal next-draw ranges over the whole pool.
+
+    Recycle boundary: when the draw pile is empty, the next draw instead recycles
+    the discard (all but the top card) and draws from it, so the support is the
+    known multiset discard[:-1], uniform.
     """
+    draw_pile_size = sum(state._remaining_deck_counts.values())
+    if draw_pile_size == 0:
+        recycled = Counter(state._discard_pile[:-1])
+        total = sum(recycled.values())
+        if total == 0:
+            raise ValueError("no drawable cards: empty draw pile and no recyclable discard")
+        pmf = {value: count / total for value, count in recycled.items()}
+        return DrawOdds(pmf=pmf)
+
     pool = _unseen_pool(state)
     total = sum(pool.values())
     pmf = {value: count / total for value, count in pool.items() if count > 0}
