@@ -92,16 +92,9 @@ def test_empty_draw_pile_uses_recycled_discard_minus_top():
     # public size + discard, so this stays black-box at the API boundary.
     state = make_main_play_state()
     state._remaining_deck_counts = Counter()
-    state._discard_pile = [3, 3, 7, 1]  # 1 is the top
-
-    assert sum(state._remaining_deck_counts.values()) == 0
-
-    recycled = Counter(state._discard_pile[:-1])  # everything but the top -> {3:2, 7:1}
-    total = sum(recycled.values())
+    state._discard_pile = [3, 3, 7, 1]  # 1 is the top; recycled pool is {3, 3, 7}
 
     odds = draw_odds(state)
 
-    assert odds.pmf.keys() == set(recycled.keys())
-    for value, count in recycled.items():
-        assert odds.pmf[value] == pytest.approx(count / total)
-    assert sum(odds.pmf.values()) == pytest.approx(1.0)
+    # Uniform over the recycled discard-minus-top: two 3s and one 7 out of three.
+    assert odds.pmf == pytest.approx({3: 2 / 3, 7: 1 / 3})

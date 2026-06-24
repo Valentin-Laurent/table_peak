@@ -68,6 +68,8 @@ def draw_odds(state: SkyjoState) -> DrawOdds:
     the discard (all but the top card) and draws from it, so the support is the
     known multiset discard[:-1], uniform.
     """
+    # The recycle branch returns before _unseen_pool's dealt-state assert; an
+    # undealt state with an empty draw pile is unreachable in normal play.
     draw_pile_size = sum(state._remaining_deck_counts.values())
     if draw_pile_size == 0:
         recycled = Counter(state._discard_pile[:-1])
