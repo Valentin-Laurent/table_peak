@@ -11,6 +11,7 @@ dependencies = [
     "torch>=2.5",
     "plotext>=5.3",
     "open_spiel>=1.5",
+    "dm-tree>=0.1.8",
 ]
 
 [dependency-groups]
