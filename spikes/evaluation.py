@@ -20,8 +20,13 @@ def aggregate_results(games: list[tuple[float, float]]) -> dict[str, float]:
     }
 
 
-def evaluate(game: Any, agent: Any, n_games: int, seed: int = 0) -> dict[str, float]:
-    """Play `n_games` split evenly across both seats; agent acts on its own turns."""
+def evaluate(game: Any, agents: list[Any], n_games: int, seed: int = 0) -> dict[str, float]:
+    """Eval the self-play agents vs a uniform-random opponent, balanced across seats.
+
+    `agents` is indexed by player_id. On the agent's turn we use `agents[pid]`
+    (whose `player_id == pid`), so the agent always reads the legal-action mask for
+    the seat it is actually playing. The other seat plays uniformly at random.
+    """
     env = rl_environment.Environment(game)
     rng = random.Random(seed)
     results: list[tuple[float, float]] = []
@@ -31,7 +36,7 @@ def evaluate(game: Any, agent: Any, n_games: int, seed: int = 0) -> dict[str, fl
         while not time_step.last():
             pid = time_step.observations["current_player"]
             if pid == agent_seat:
-                action = agent.step(time_step, is_evaluation=True).action
+                action = agents[pid].step(time_step, is_evaluation=True).action
             else:
                 legal = time_step.observations["legal_actions"][pid]
                 action = rng.choice(legal)

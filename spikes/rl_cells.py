@@ -55,7 +55,7 @@ def run_nfsp_cell(game: Any, mode: PayoffMode) -> dict[str, float]:
         for p in range(2)
     ]
     _train(agents, game, mode)
-    return evaluate(game, agents[0], NUM_EVAL_GAMES)
+    return evaluate(game, agents, NUM_EVAL_GAMES)
 
 
 def run_dqn_cell(game: Any, mode: PayoffMode) -> dict[str, float]:
@@ -72,4 +72,4 @@ def run_dqn_cell(game: Any, mode: PayoffMode) -> dict[str, float]:
         for p in range(2)
     ]
     _train(agents, game, mode)
-    return evaluate(game, agents[0], NUM_EVAL_GAMES)
+    return evaluate(game, agents, NUM_EVAL_GAMES)
