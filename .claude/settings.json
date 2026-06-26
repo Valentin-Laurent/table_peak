@@ -24,8 +24,6 @@
     "deny": [
       "Edit(./Makefile)",
       "Write(./Makefile)",
-      "Edit(./**/Makefile)",
-      "Write(./**/Makefile)"
     ]
   }
 }
