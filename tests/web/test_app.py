@@ -11,6 +11,8 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from table_peak.games.quoridor import actions as q
+from table_peak.games.quoridor.geometry import Cell, Orientation, WallAnchor
 from table_peak.web.app import app, get_store
 from table_peak.web.sessions import InMemorySessionStore
 
@@ -152,3 +154,67 @@ def test_out_of_range_cell_rejected(client: TestClient) -> None:
     game_id = _create_game(client, "Human", "Minimax")
     r = client.post(f"/games/{game_id}/move", data={"action": "99"})
     assert r.status_code == 400
+
+
+def _create_quoridor(client: TestClient, x_agent: str, o_agent: str) -> str:
+    """Helper: create a Quoridor game, return its id."""
+    r = client.post(
+        "/games",
+        data={"game": "quoridor", "x_agent": x_agent, "o_agent": o_agent},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    return str(r.headers["location"]).rsplit("/", 1)[-1]
+
+
+def test_new_game_page_offers_quoridor(client: TestClient) -> None:
+    r = client.get("/")
+    assert r.status_code == 200
+    assert 'value="quoridor"' in r.text
+
+
+def test_quoridor_game_page_renders_board(client: TestClient) -> None:
+    game_id = _create_quoridor(client, "Human", "Human")
+    r = client.get(f"/games/{game_id}")
+    assert r.status_code == 200
+    assert 'id="board"' in r.text
+    assert "Player 1" in r.text
+    assert "pawn p0" in r.text
+
+
+def test_quoridor_human_pawn_move_applies(client: TestClient) -> None:
+    game_id = _create_quoridor(client, "Human", "Human")
+    # P0 steps forward from (4,0) to (4,1).
+    action = q.encode_move(Cell(col=4, row=1))
+    r = client.post(f"/games/{game_id}/move", data={"action": str(action)})
+    assert r.status_code == 200
+    assert 'id="board"' in r.text  # response is the board fragment
+
+
+def test_quoridor_human_wall_move_applies(client: TestClient) -> None:
+    game_id = _create_quoridor(client, "Human", "Human")
+    # A resolved wall action (what the 2-click JS ultimately POSTs).
+    action = q.encode_wall(WallAnchor(col=2, row=3), Orientation.HORIZONTAL)
+    r = client.post(f"/games/{game_id}/move", data={"action": str(action)})
+    assert r.status_code == 200
+    # The wall renders solid: assert the rendered class attribute, not the bare
+    # substring "placed" (the partial's inline <style> always contains .seg.placed).
+    assert 'class="seg placed"' in r.text
+
+
+def test_quoridor_illegal_action_rejected(client: TestClient) -> None:
+    game_id = _create_quoridor(client, "Human", "Human")
+    # Teleporting P0 across the board is not a legal action.
+    action = q.encode_move(Cell(col=0, row=8))
+    r = client.post(f"/games/{game_id}/move", data={"action": str(action)})
+    assert r.status_code == 400
+
+
+def test_quoridor_human_vs_random_bot_replies(client: TestClient) -> None:
+    game_id = _create_quoridor(client, "Human", "Random")
+    # GET fast-forwards nothing (P0/human is first); human moves, bot replies.
+    action = q.encode_move(Cell(col=4, row=1))
+    r = client.post(f"/games/{game_id}/move", data={"action": str(action)})
+    assert r.status_code == 200
+    # After the human move + bot reply it is the human's turn again, or game over.
+    assert "Player 1" in r.text or "Game over" in r.text

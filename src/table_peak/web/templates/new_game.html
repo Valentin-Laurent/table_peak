@@ -56,5 +56,27 @@
             <button type="submit">Start Skyjo</button>
         </fieldset>
     </form>
+
+    <form action="/games" method="post">
+        <fieldset>
+            <legend>Quoridor</legend>
+            <input type="hidden" name="game" value="quoridor">
+            <label>
+                Player 1 (you, bottom):
+                <select name="x_agent">
+                    <option value="Human" selected>Human</option>
+                    <option value="Random">Random</option>
+                </select>
+            </label>
+            <label>
+                Player 2 (top):
+                <select name="o_agent">
+                    <option value="Human">Human</option>
+                    <option value="Random" selected>Random</option>
+                </select>
+            </label>
+            <button type="submit">Start Quoridor</button>
+        </fieldset>
+    </form>
 </body>
 </html>

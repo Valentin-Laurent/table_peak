@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 
 from table_peak.agents.base import Agent
 from table_peak.games.base import PlayerId
+from table_peak.games.quoridor import QuoridorGameWrapper
 from table_peak.games.tic_tac_toe import TicTacToe
 from table_peak.web.agents import AGENT_REGISTRY
 from table_peak.web.renderers import RENDERERS
@@ -89,6 +90,16 @@ def create_game(
         session = GameSession(
             game="tic_tac_toe",
             state=TicTacToe().new_initial_state(),
+            agents=agents,
+        )
+    elif game == "quoridor":
+        agents = {
+            0: _build_agent(x_agent),
+            1: _build_agent(o_agent),
+        }
+        session = GameSession(
+            game="quoridor",
+            state=QuoridorGameWrapper(seed=secrets.randbelow(2**31)).new_initial_state(),
             agents=agents,
         )
     else:

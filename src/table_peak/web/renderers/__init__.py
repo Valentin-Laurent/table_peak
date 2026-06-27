@@ -11,11 +11,12 @@ from typing import Any
 
 from table_peak.agents.base import Agent
 from table_peak.games.base import PlayerId
-from table_peak.web.renderers import skyjo, tic_tac_toe
+from table_peak.web.renderers import quoridor, skyjo, tic_tac_toe
 
 RenderFn = Callable[[Any, dict[PlayerId, Agent | None], str], Any]
 
 RENDERERS: dict[str, RenderFn] = {
     "tic_tac_toe": tic_tac_toe.render,
     "skyjo": skyjo.render,
+    "quoridor": quoridor.render,
 }
