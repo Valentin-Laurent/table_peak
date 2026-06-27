@@ -23,7 +23,7 @@
     ],
     "deny": [
       "Edit(./Makefile)",
-      "Write(./Makefile)",
+      "Write(./Makefile)"
     ]
   }
 }
