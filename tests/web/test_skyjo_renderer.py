@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+from collections import Counter
 from typing import Any
 
 from table_peak.agents.base import Agent
@@ -10,6 +11,7 @@ from table_peak.agents.random import RandomAgent
 from table_peak.games.base import PlayerId
 from table_peak.games.skyjo import SkyjoGameWrapper
 from table_peak.games.skyjo import actions as sk
+from table_peak.games.skyjo.odds import draw_odds
 from table_peak.web.renderers.skyjo import render
 
 
@@ -86,6 +88,7 @@ def test_bot_turn_awaits_next_and_carries_last_event() -> None:
     assert view.is_my_turn is False
     assert view.awaiting_bot is True
     assert view.last_event == "Bot 1 drew from the deck."
+    assert view.odds is None  # odds only surface on the human's own turn
 
 
 def test_setup_first_pick_arms_each_card() -> None:
@@ -150,6 +153,84 @@ def test_branch_b_armed_places_drawn_card_on_any_slot() -> None:
         assert card.action == sk.encode_replace_from_hand(slot)
 
 
+def _to_branch_b(num_players: int, seed: int) -> Any:
+    """A human root state advanced one DrawDeck into branch-b."""
+    state = _to_human_turn(num_players, seed)
+    return state.apply_action(sk.encode_draw_deck())
+
+
+def test_root_turn_carries_odds_matching_the_engine() -> None:
+    state = _to_human_turn(num_players=2, seed=3)
+    view = render(state, _agents(2), "g1")
+    engine = draw_odds(state.inner)
+    assert view.odds is not None
+    assert view.discard_top is not None  # root turn always has a discard top
+    assert view.odds.expected_value == engine.expected_value()
+
+
+def test_threshold_param_drives_prob_less_than() -> None:
+    state = _to_human_turn(num_players=2, seed=3)
+    view = render(state, _agents(2), "g1", threshold=3.0)
+    engine = draw_odds(state.inner)
+    assert view.odds is not None
+    assert view.odds.threshold == 3.0
+    assert view.odds.prob_less_than == engine.prob_less_than(3.0)
+
+
+def test_no_threshold_seeds_explorer_at_discard_top() -> None:
+    # Seeded at the discard top, the explorer's P(next card < top) is exactly the
+    # 'a deck draw beats taking the top' odds.
+    state = _to_human_turn(num_players=2, seed=3)
+    view = render(state, _agents(2), "g1")
+    engine = draw_odds(state.inner)
+    assert view.odds is not None
+    assert view.discard_top is not None  # root turn always has a discard top
+    assert view.odds.threshold == view.discard_top
+    assert view.odds.prob_less_than == engine.prob_less_than(view.discard_top)
+
+
+def test_branch_b_and_setup_have_no_odds() -> None:
+    assert render(_to_branch_b(2, 3), _agents(2), "g1").odds is None
+    setup = SkyjoGameWrapper(num_players=2, seed=3).new_initial_state()
+    assert render(setup, _agents(2), "g1").odds is None
+
+
+def test_recycle_boundary_still_renders_odds() -> None:
+    # Deterministically force the recycle boundary at a human main-play root:
+    # empty the draw pile and set a known discard, mirroring the engine's own
+    # test_empty_draw_pile_uses_recycled_discard_minus_top. Odds still render off
+    # the recycled pool.
+    state = _to_human_turn(num_players=2, seed=3)
+    state.inner._remaining_deck_counts = Counter()  # draw pile exhausted
+    state.inner._discard_pile = [3, 3, 7, 1]  # top is 1; recycled pool is {3, 3, 7}
+    view = render(state, _agents(2), "g1")
+    engine = draw_odds(state.inner)
+    assert view.odds is not None
+    assert view.discard_top is not None
+    assert view.odds.prob_less_than == engine.prob_less_than(view.discard_top)
+
+
+def test_armed_root_hides_odds_panel() -> None:
+    # Once the discard is armed (place-mode), the draw-vs-take decision is made;
+    # the explorer must vanish so its htmx round-trip can't drop the armed state.
+    state = _to_human_turn(num_players=2, seed=3)
+    view = render(state, _agents(2), "g1", armed=True)
+    assert view.armed is True
+    assert view.odds is None
+
+
+def test_empty_discard_root_renders_odds_without_probabilities() -> None:
+    # An empty discard (no top card) is rare but legal: EV still shows, but the
+    # discard-relative probabilities have no reference value and stay None.
+    state = _to_human_turn(num_players=2, seed=3)
+    state.inner._discard_pile = []
+    view = render(state, _agents(2), "g1")
+    assert view.discard_top is None
+    assert view.odds is not None
+    assert view.odds.threshold is None
+    assert view.odds.prob_less_than is None
+
+
 def test_terminal_shows_sorted_scores_and_no_clickable_cards() -> None:
     rng = random.Random(42)
     state = SkyjoGameWrapper(num_players=2, seed=42).new_initial_state()
@@ -157,6 +238,7 @@ def test_terminal_shows_sorted_scores_and_no_clickable_cards() -> None:
         state = state.apply_action(rng.choice(list(state.legal_actions())))
     view = render(state, _agents(2), "g1")
     assert view.is_terminal is True
+    assert view.odds is None  # no odds panel once the round is over
     assert view.draw_pile_clickable is False
     assert view.awaiting_bot is False
     assert all(not card.clickable for card in view.you.cards)

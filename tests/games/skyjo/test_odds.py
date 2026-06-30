@@ -13,23 +13,23 @@ from table_peak.games.skyjo.deck import DECK_COMPOSITION
 from table_peak.games.skyjo.odds import DrawOdds, draw_odds
 
 
-def test_pmf_is_exposed_as_given():
+def test_pmf_is_exposed_as_given() -> None:
     odds = DrawOdds(pmf={-2: 0.5, 5: 0.5})
     assert odds.pmf == {-2: 0.5, 5: 0.5}
 
 
-def test_expected_value_is_probability_weighted_mean():
+def test_expected_value_is_probability_weighted_mean() -> None:
     odds = DrawOdds(pmf={-2: 0.25, 0: 0.5, 4: 0.25})
     # 0.25*-2 + 0.5*0 + 0.25*4 = 0.5
     assert odds.expected_value() == pytest.approx(0.5)
 
 
-def test_prob_at_most_sums_probabilities_up_to_threshold_inclusive():
+def test_prob_less_than_sums_probabilities_strictly_below_threshold() -> None:
     odds = DrawOdds(pmf={-2: 0.2, 0: 0.3, 5: 0.5})
-    assert odds.prob_at_most(0) == pytest.approx(0.5)  # -2 and 0
-    assert odds.prob_at_most(-2) == pytest.approx(0.2)  # only -2
-    assert odds.prob_at_most(12) == pytest.approx(1.0)  # everything
-    assert odds.prob_at_most(-3) == pytest.approx(0.0)  # nothing
+    assert odds.prob_less_than(0) == pytest.approx(0.2)  # only -2 (0 excluded)
+    assert odds.prob_less_than(5) == pytest.approx(0.5)  # -2 and 0 (5 excluded)
+    assert odds.prob_less_than(13) == pytest.approx(1.0)  # everything
+    assert odds.prob_less_than(-2) == pytest.approx(0.0)  # nothing (-2 excluded)
 
 
 def make_main_play_state(num_players: int = 2, seed: int = 0) -> pyspiel.State:
@@ -48,7 +48,7 @@ def make_main_play_state(num_players: int = 2, seed: int = 0) -> pyspiel.State:
     return state
 
 
-def _expected_pool(state) -> Counter[int]:
+def _expected_pool(state: pyspiel.State) -> Counter[int]:
     pool: Counter[int] = Counter(DECK_COMPOSITION)
     for grid in state._grids:
         for value in grid.face_up_values().values():
@@ -58,7 +58,7 @@ def _expected_pool(state) -> Counter[int]:
     return +pool  # drop zero/negative entries
 
 
-def test_pmf_matches_unseen_pool_normalized():
+def test_pmf_matches_unseen_pool_normalized() -> None:
     state = make_main_play_state()
     pool = _expected_pool(state)
     total = sum(pool.values())
@@ -71,12 +71,12 @@ def test_pmf_matches_unseen_pool_normalized():
             assert odds.pmf[value] == pytest.approx(count / total)
 
 
-def test_pmf_sums_to_one():
+def test_pmf_sums_to_one() -> None:
     odds = draw_odds(make_main_play_state())
     assert sum(odds.pmf.values()) == pytest.approx(1.0)
 
 
-def test_pool_size_invariant_holds():
+def test_pool_size_invariant_holds() -> None:
     state = make_main_play_state()
     draw_pile_size = sum(state._remaining_deck_counts.values())
     face_down = sum(g.num_face_down for g in state._grids)
@@ -86,7 +86,15 @@ def test_pool_size_invariant_holds():
     assert sum(pool.values()) == draw_pile_size + face_down
 
 
-def test_empty_draw_pile_uses_recycled_discard_minus_top():
+def test_prob_less_than_accepts_float_threshold() -> None:
+    odds = DrawOdds(pmf={-2: 0.2, 0: 0.3, 5: 0.5})
+    # A .5 boundary includes everything strictly below it (no card equals it,
+    # so < and <= coincide there).
+    assert odds.prob_less_than(0.5) == pytest.approx(0.5)  # -2 and 0
+    assert odds.prob_less_than(-1.5) == pytest.approx(0.2)  # only -2
+
+
+def test_empty_draw_pile_uses_recycled_discard_minus_top() -> None:
     # Build a real MAIN_PLAY state via the suite helper, then (Arrange step only)
     # force an empty draw pile and a known discard pile. draw_odds still reads only
     # public size + discard, so this stays black-box at the API boundary.

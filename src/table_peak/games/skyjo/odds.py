@@ -32,13 +32,16 @@ class DrawOdds:
         """Probability-weighted mean of the drawn card value."""
         return sum(value * prob for value, prob in self.pmf.items())
 
-    def prob_at_most(self, threshold: int) -> float:
-        """Probability the drawn value is <= threshold (inclusive).
+    def prob_less_than(self, threshold: float) -> float:
+        """Probability the drawn value is strictly < threshold.
 
-        'Beats a discard top of value t' means drawing strictly less than t, i.e.
-        callers use prob_at_most(t - 1).
+        Threshold is numeric: card values are integers, but a float threshold is
+        well-defined (only the .5 boundaries differ from the nearest integer), so
+        the UI's free-form explorer can pass floats. Seeded at a discard top of
+        value t, this is exactly 'a deck draw beats taking the t': in Skyjo lower
+        is better and a tie does not improve you, so beating t means drawing < t.
         """
-        return sum(prob for value, prob in self.pmf.items() if value <= threshold)
+        return sum(prob for value, prob in self.pmf.items() if value < threshold)
 
 
 def _unseen_pool(state: SkyjoState) -> Counter[int]:

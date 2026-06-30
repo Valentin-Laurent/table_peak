@@ -77,7 +77,8 @@ def test_terminal_status_reports_winner() -> None:
 
 
 def _parse_walls(view: QuoridorBoardView) -> list[dict[str, Any]]:
-    return json.loads(view.legal_walls_json)
+    walls: list[dict[str, Any]] = json.loads(view.legal_walls_json)
+    return walls
 
 
 def test_initial_legal_walls_payload_decomposes_into_segments() -> None:
@@ -128,13 +129,7 @@ def _render_partial(view: QuoridorBoardView) -> str:
 
     from jinja2 import Environment, FileSystemLoader
 
-    templates_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "table_peak"
-        / "web"
-        / "templates"
-    )
+    templates_dir = Path(__file__).resolve().parents[2] / "src" / "table_peak" / "web" / "templates"
     env = Environment(loader=FileSystemLoader(str(templates_dir)), autoescape=True)
     return env.get_template("_quoridor_board.html").render(view=view)
 
@@ -155,9 +150,7 @@ def test_template_renders_board_pawns_and_status() -> None:
 
 def test_template_renders_placed_wall_segments() -> None:
     state = _initial()
-    state = state.apply_action(
-        q.encode_wall(WallAnchor(col=2, row=3), Orientation.HORIZONTAL)
-    )
+    state = state.apply_action(q.encode_wall(WallAnchor(col=2, row=3), Orientation.HORIZONTAL))
     view = render(state, _human_vs_human(), "g1")
     html = _render_partial(view)
     # A placed wall renders its segments with the "placed" class. Assert on the

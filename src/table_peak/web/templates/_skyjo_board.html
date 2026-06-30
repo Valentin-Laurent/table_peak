@@ -1,14 +1,19 @@
 <div id="board">
     <style>
-        .skyjo { font-family: system-ui, sans-serif; }
+        .skyjo { font-family: system-ui, sans-serif; text-align: center; }
         .turns { display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
-                 font-size: 12px; margin-bottom: 10px; }
+                 justify-content: center; font-size: 12px; margin-bottom: 10px; }
         .turns .seat { padding: 2px 8px; border-radius: 12px; background: #2b323d; color: #aeb6c2; }
         .turns .seat.cur { background: #4f9d5b; color: #fff; font-weight: 700; }
         .turns .arrow { opacity: .5; }
         .opps { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 12px; }
         .panel { border: 1px solid #39414f; border-radius: 8px; padding: 8px; }
         .panel.you { border-color: #4f9d5b; display: block; width: fit-content; margin: 0 auto; }
+        .board-center { position: relative; width: fit-content; margin: 0 auto; }
+        .panel.odds { border-color: #d9a23b; position: absolute; top: 0; left: 100%;
+                      margin-left: 16px; width: 280px; text-align: left; }
+        .odds-stat { font-size: .95rem; margin: 4px 0; }
+        .odds-explore { font-size: .95rem; margin: 6px 0; }
         .panel .tag { font-size: 11px; opacity: .8; margin-bottom: 4px; }
         .sgrid { display: grid; gap: 3px; }
         .card { width: 40px; height: 52px; border-radius: 5px; display: flex; align-items: center;
@@ -25,7 +30,7 @@
         .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 8px; }
         .status { font-size: 1.1rem; margin: 8px 0; }
         .event { font-size: .95rem; color: #d9a23b; margin: 4px 0; min-height: 1.2em; }
-        table.scores { margin: 8px 0; border-collapse: collapse; }
+        table.scores { margin: 8px auto; border-collapse: collapse; }
         table.scores td { border: 1px solid #ccc; padding: 2px 10px; }
     </style>
 
@@ -54,6 +59,7 @@
             {% endfor %}
         </div>
 
+        <div class="board-center">
         <div class="piles">
             <div class="pile {% if view.draw_pile_clickable %}clickable{% endif %}"
                  {% if view.draw_pile_clickable %}
@@ -87,6 +93,23 @@
             {% endif %}
         </div>
 
+        {% if view.odds %}
+        <div class="panel odds">
+            <div class="tag">Draw odds — your decision</div>
+            <p class="odds-stat">Avg unseen card: <b>{{ "%.1f"|format(view.odds.expected_value) }}</b></p>
+            <form class="odds-explore" hx-get="/games/{{ view.game_id }}/board"
+                  hx-target="#board" hx-swap="outerHTML" hx-trigger="change">
+                <label>P(deck draw &lt;
+                    <input type="number" name="threshold" step="0.5" style="width:4em;"
+                           {% if view.odds.threshold is not none %}value="{{ view.odds.threshold }}"{% endif %}>)
+                </label>
+                {% if view.odds.prob_less_than is not none %}
+                = <b>{{ "%.0f"|format(view.odds.prob_less_than * 100) }}%</b>
+                {% endif %}
+            </form>
+        </div>
+        {% endif %}
+
         <div class="panel you">
             <div class="tag">{{ view.you.label }} · sum {{ view.you.face_up_sum }}{% if view.you.is_current %} · ▶{% endif %}</div>
             <div class="sgrid" style="grid-template-columns: repeat({{ view.you.num_columns }}, 44px);">
@@ -105,6 +128,7 @@
                     {% endif %}
                 {% endfor %}
             </div>
+        </div>
         </div>
 
         {% if not view.is_terminal %}

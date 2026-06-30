@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import random
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
+from table_peak.agents.base import Agent
+from table_peak.agents.random import RandomAgent
+from table_peak.games.skyjo import SkyjoGameWrapper
 from table_peak.games.skyjo import actions as sk
 from table_peak.web.app import app, get_store
 from table_peak.web.renderers.skyjo import render
-from table_peak.web.sessions import InMemorySessionStore
+from table_peak.web.sessions import GameSession, InMemorySessionStore
 from table_peak.web.skyjo_play import HUMAN_SEAT, advance_bot_setup, new_skyjo_session
 
 
@@ -144,3 +149,41 @@ def test_full_round_playthrough_reaches_terminal_with_scores(client: TestClient)
     assert "Round over" in html
     # The score table is present (one row per player => at least two <td> score cells).
     assert html.count("</td>") >= 4
+
+
+def _skyjo_root_state(num_players: int, seed: int) -> Any:
+    """A PyspielStateAdapter on seat 0's main-play root turn."""
+    rng = random.Random(seed)
+    state = SkyjoGameWrapper(num_players=num_players, seed=seed).new_initial_state()
+
+    def in_setup(s: Any) -> bool:
+        legal = list(s.legal_actions())
+        return bool(legal) and all(
+            sk.decode(a).kind == sk.ActionKind.REVEAL_INITIAL for a in legal
+        )
+
+    while not state.is_terminal and in_setup(state):
+        state = state.apply_action(rng.choice(list(state.legal_actions())))
+    while not state.is_terminal and state.current_player != 0:
+        state = state.apply_action(rng.choice(list(state.legal_actions())))
+    return state
+
+
+def test_board_route_renders_odds_panel_with_threshold() -> None:
+    store = InMemorySessionStore()
+    agents: dict[int, Agent | None] = {0: None, 1: RandomAgent(random.Random(1))}
+    game_id = store.create(
+        GameSession(game="skyjo", state=_skyjo_root_state(2, 3), agents=agents)
+    )
+    app.dependency_overrides[get_store] = lambda: store
+    try:
+        with TestClient(app) as c:
+            r = c.get(f"/games/{game_id}/board?threshold=3")
+            assert r.status_code == 200, r.text
+            assert "Avg unseen card" in r.text
+            # Prove the threshold was actually forwarded: the explorer input is
+            # seeded with it (3 -> 3.0) and the probability line is rendered.
+            assert 'value="3.0"' in r.text
+            assert "P(next card" in r.text
+    finally:
+        app.dependency_overrides.pop(get_store, None)

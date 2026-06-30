@@ -22,6 +22,7 @@ from table_peak.agents.base import Agent
 from table_peak.games._pyspiel_adapter import PyspielStateAdapter
 from table_peak.games.base import PlayerId
 from table_peak.games.skyjo import actions as sk
+from table_peak.games.skyjo.odds import draw_odds
 from table_peak.games.skyjo.view import SkyjoPublicView, build_public_view
 
 PARTIAL = "_skyjo_board.html"
@@ -56,6 +57,16 @@ class TurnSlot:
 
 
 @dataclass(frozen=True, slots=True)
+class OddsPanel:
+    """Draw-odds shown at the human's main-play root. All probabilities are in
+    [0, 1]; the template formats them as percentages."""
+
+    expected_value: float
+    threshold: float | None  # value the explorer input is seeded at (None if no seed)
+    prob_less_than: float | None  # P(next card < threshold); None if threshold is None
+
+
+@dataclass(frozen=True, slots=True)
 class SkyjoBoardView:
     partial: str
     title: str
@@ -68,6 +79,7 @@ class SkyjoBoardView:
     turn_order: tuple[TurnSlot, ...]
     you: SkyjoPanel
     opponents: tuple[SkyjoPanel, ...]
+    odds: OddsPanel | None
     discard_top: int | None
     discard_css: str
     discard_clickable: bool
@@ -203,6 +215,34 @@ def _status(
     return "Your turn — click the draw pile to draw, or the discard pile to take its top card."
 
 
+def _odds_panel(
+    state: PyspielStateAdapter,
+    pv: SkyjoPublicView,
+    your_turn: bool,
+    armed: bool,
+    threshold: float | None,
+) -> OddsPanel | None:
+    """Draw odds for the human's *un-armed* main-play root only. None elsewhere
+    (setup, branch-b, bot turn, terminal — see the spec's 'Why root-only') and
+    also once armed: place-mode means the draw-vs-take decision is already made,
+    and keeping the explorer live there would drop the armed state on its htmx
+    round-trip."""
+    if not (your_turn and pv.phase == "main_play" and not armed):
+        return None
+    try:
+        odds = draw_odds(state.inner)
+    except ValueError:
+        return None  # degenerate: empty draw pile and no recyclable discard
+    active_threshold = threshold if threshold is not None else pv.discard_top
+    return OddsPanel(
+        expected_value=odds.expected_value(),
+        threshold=active_threshold,
+        prob_less_than=(
+            odds.prob_less_than(active_threshold) if active_threshold is not None else None
+        ),
+    )
+
+
 def render(
     state: Any,
     agents: dict[PlayerId, Agent | None],
@@ -211,6 +251,7 @@ def render(
     armed: bool = False,
     reveal_first: int | None = None,
     last_event: str | None = None,
+    threshold: float | None = None,
 ) -> SkyjoBoardView:
     assert isinstance(state, PyspielStateAdapter)
     human_seat = _human_seat(agents)
@@ -237,6 +278,7 @@ def render(
         for seat in range(pv.num_players)
         if seat != human_seat
     )
+    odds = _odds_panel(state, pv, your_turn, armed, threshold)
 
     turn_order = tuple(
         TurnSlot(
@@ -260,6 +302,7 @@ def render(
         turn_order=turn_order,
         you=you,
         opponents=opponents,
+        odds=odds,
         discard_top=pv.discard_top,
         discard_css=_css(pv.discard_top),
         discard_clickable=in_root and not armed and pv.discard_top is not None,

@@ -49,6 +49,7 @@ def _render(
     *,
     armed: bool = False,
     reveal_first: int | None = None,
+    threshold: float | None = None,
 ) -> Any:
     if session.game == "skyjo":
         return skyjo_renderer.render(
@@ -57,6 +58,7 @@ def _render(
             game_id,
             armed=armed,
             reveal_first=reveal_first,
+            threshold=threshold,
             last_event=session.last_event,
         )
     render_fn = RENDERERS.get(session.game)
@@ -179,10 +181,13 @@ def board_fragment(
     store: Annotated[InMemorySessionStore, Depends(get_store)],
     armed: str | None = None,
     reveal_first: int | None = None,
+    threshold: float | None = None,
 ) -> HTMLResponse:
     session = store.get(game_id)
     if session is None:
         raise HTTPException(status_code=404)
     # `armed` (any value) = place-mode; `reveal_first` = the first slot picked in setup.
-    view = _render(session, game_id, armed=(armed is not None), reveal_first=reveal_first)
+    view = _render(
+        session, game_id, armed=(armed is not None), reveal_first=reveal_first, threshold=threshold
+    )
     return templates.TemplateResponse(request, view.partial, {"view": view})
