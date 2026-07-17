@@ -87,12 +87,28 @@ def is_wall_legal(
     if walls_remaining <= 0 or not anchor_on_board(anchor):
         return False
     if orientation is Orientation.HORIZONTAL:
-        if anchor in horizontal_walls or anchor in vertical_walls:
+        # Reject a cross at this intersection (same-anchor vertical wall) and any
+        # collinear horizontal neighbour, which would share a unit segment: a
+        # wall at (col, row) spans segments h-col-row and h-(col+1)-row, so
+        # (col-1, row) and (col+1, row) overlap it.
+        if (
+            anchor in horizontal_walls
+            or anchor in vertical_walls
+            or WallAnchor(col=anchor.col - 1, row=anchor.row) in horizontal_walls
+            or WallAnchor(col=anchor.col + 1, row=anchor.row) in horizontal_walls
+        ):
             return False
         trial_horizontal = horizontal_walls | {anchor}
         trial_vertical = vertical_walls
     else:
-        if anchor in vertical_walls or anchor in horizontal_walls:
+        # Symmetric: a vertical wall at (col, row) spans v-col-row and
+        # v-col-(row+1), so (col, row-1) and (col, row+1) overlap it.
+        if (
+            anchor in vertical_walls
+            or anchor in horizontal_walls
+            or WallAnchor(col=anchor.col, row=anchor.row - 1) in vertical_walls
+            or WallAnchor(col=anchor.col, row=anchor.row + 1) in vertical_walls
+        ):
             return False
         trial_horizontal = horizontal_walls
         trial_vertical = vertical_walls | {anchor}

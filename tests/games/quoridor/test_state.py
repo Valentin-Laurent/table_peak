@@ -4,8 +4,8 @@ import pyspiel  # type: ignore[import-not-found]
 import pytest
 
 import table_peak.games.quoridor  # noqa: F401
-from table_peak.games.quoridor.actions import encode_move
-from table_peak.games.quoridor.geometry import Cell
+from table_peak.games.quoridor.actions import encode_move, encode_wall
+from table_peak.games.quoridor.geometry import Cell, Orientation, WallAnchor
 
 
 def test_registered_game_starts_with_player_zero_and_forward_move() -> None:
@@ -22,6 +22,17 @@ def test_illegal_action_raises_value_error() -> None:
     state = game.new_initial_state()
     with pytest.raises(ValueError, match="Illegal action"):
         state.apply_action(encode_move(Cell(col=4, row=8)))
+
+
+def test_overlapping_horizontal_wall_is_neither_offered_nor_accepted() -> None:
+    game = pyspiel.load_game("quoridor", {"seed": 0})
+    state = game.new_initial_state()
+    state.apply_action(encode_wall(WallAnchor(col=1, row=0), Orientation.HORIZONTAL))
+    # Player 1 tries a horizontal wall one anchor over: it shares segment h-2-0.
+    overlapping = encode_wall(WallAnchor(col=2, row=0), Orientation.HORIZONTAL)
+    assert overlapping not in set(state.legal_actions())
+    with pytest.raises(ValueError, match="Illegal action"):
+        state.apply_action(overlapping)
 
 
 def test_straight_race_to_goal_row_returns_win_for_player_zero() -> None:
