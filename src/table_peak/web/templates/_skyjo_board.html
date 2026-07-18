@@ -99,7 +99,7 @@
             <p class="odds-stat">Avg unseen card: <b>{{ "%.1f"|format(view.odds.expected_value) }}</b></p>
             <form class="odds-explore" hx-get="/games/{{ view.game_id }}/board"
                   hx-target="#board" hx-swap="outerHTML" hx-trigger="change">
-                <label>P(deck draw &lt;
+                <label>P(next card &lt;
                     <input type="number" name="threshold" step="0.5" style="width:4em;"
                            {% if view.odds.threshold is not none %}value="{{ view.odds.threshold }}"{% endif %}>)
                 </label>
