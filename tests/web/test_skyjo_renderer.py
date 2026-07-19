@@ -159,15 +159,6 @@ def _to_branch_b(num_players: int, seed: int) -> Any:
     return state.apply_action(sk.encode_draw_deck())
 
 
-def test_root_turn_carries_odds_matching_the_engine() -> None:
-    state = _to_human_turn(num_players=2, seed=3)
-    view = render(state, _agents(2), "g1")
-    engine = draw_odds(state.inner)
-    assert view.odds is not None
-    assert view.discard_top is not None  # root turn always has a discard top
-    assert view.odds.expected_value == engine.expected_value()
-
-
 def test_threshold_param_drives_prob_less_than() -> None:
     state = _to_human_turn(num_players=2, seed=3)
     view = render(state, _agents(2), "g1", threshold=3.0)
@@ -187,6 +178,23 @@ def test_no_threshold_seeds_explorer_at_discard_top() -> None:
     assert view.discard_top is not None  # root turn always has a discard top
     assert view.odds.threshold == view.discard_top
     assert view.odds.prob_less_than == engine.prob_less_than(view.discard_top)
+
+
+def test_threshold_param_drives_prob_equal() -> None:
+    state = _to_human_turn(num_players=2, seed=3)
+    view = render(state, _agents(2), "g1", threshold=3.0)
+    engine = draw_odds(state.inner)
+    assert view.odds is not None
+    assert view.odds.prob_equal == engine.prob_equal(3.0)
+
+
+def test_no_threshold_seeds_prob_equal_at_discard_top() -> None:
+    state = _to_human_turn(num_players=2, seed=3)
+    view = render(state, _agents(2), "g1")
+    engine = draw_odds(state.inner)
+    assert view.odds is not None
+    assert view.discard_top is not None  # root turn always has a discard top
+    assert view.odds.prob_equal == engine.prob_equal(view.discard_top)
 
 
 def test_branch_b_and_setup_have_no_odds() -> None:

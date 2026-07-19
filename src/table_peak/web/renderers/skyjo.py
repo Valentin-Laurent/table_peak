@@ -61,9 +61,9 @@ class OddsPanel:
     """Draw-odds shown at the human's main-play root. All probabilities are in
     [0, 1]; the template formats them as percentages."""
 
-    expected_value: float
     threshold: float | None  # value the explorer input is seeded at (None if no seed)
     prob_less_than: float | None  # P(next card < threshold); None if threshold is None
+    prob_equal: float | None  # P(next card == threshold); None if threshold is None
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,11 +235,11 @@ def _odds_panel(
         return None  # degenerate: empty draw pile and no recyclable discard
     active_threshold = threshold if threshold is not None else pv.discard_top
     return OddsPanel(
-        expected_value=odds.expected_value(),
         threshold=active_threshold,
         prob_less_than=(
             odds.prob_less_than(active_threshold) if active_threshold is not None else None
         ),
+        prob_equal=(odds.prob_equal(active_threshold) if active_threshold is not None else None),
     )
 
 

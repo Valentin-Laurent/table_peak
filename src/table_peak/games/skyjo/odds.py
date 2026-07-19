@@ -32,6 +32,18 @@ class DrawOdds:
         """Probability-weighted mean of the drawn card value."""
         return sum(value * prob for value, prob in self.pmf.items())
 
+    def prob_equal(self, value: float) -> float:
+        """Probability the drawn value equals `value` exactly (0 outside the support).
+
+        Column-clearing: a Skyjo column of three equal cards is removed and scores
+        zero, so when a column already holds two of value v, this is the chance the
+        next card is the third v that clears it. A thin selection over the pmf, named
+        so the intent is explicit and reusable by the UI and agents. Accepts a float
+        (the UI's free-form input): a whole-number float equals its integer card, and
+        a .5 boundary equals no card, so its probability is zero.
+        """
+        return sum(prob for card, prob in self.pmf.items() if card == value)
+
     def prob_less_than(self, threshold: float) -> float:
         """Probability the drawn value is strictly < threshold.
 

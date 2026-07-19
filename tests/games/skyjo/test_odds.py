@@ -32,6 +32,21 @@ def test_prob_less_than_sums_probabilities_strictly_below_threshold() -> None:
     assert odds.prob_less_than(-2) == pytest.approx(0.0)  # nothing (-2 excluded)
 
 
+def test_prob_equal_looks_up_probability_of_exact_value() -> None:
+    odds = DrawOdds(pmf={-2: 0.2, 0: 0.3, 5: 0.5})
+    assert odds.prob_equal(0) == pytest.approx(0.3)
+    assert odds.prob_equal(5) == pytest.approx(0.5)
+    assert odds.prob_equal(7) == pytest.approx(0.0)  # not in support
+
+
+def test_prob_equal_accepts_float_threshold() -> None:
+    odds = DrawOdds(pmf={-2: 0.2, 0: 0.3, 5: 0.5})
+    # A whole-number float equals its integer card (5.0 == 5); a .5 boundary
+    # equals no card, so its exact-value probability is zero.
+    assert odds.prob_equal(5.0) == pytest.approx(0.5)
+    assert odds.prob_equal(4.5) == pytest.approx(0.0)
+
+
 def make_main_play_state(num_players: int = 2, seed: int = 0) -> pyspiel.State:
     """Build a real SkyjoState driven into Phase.MAIN_PLAY.
 

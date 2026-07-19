@@ -158,9 +158,7 @@ def _skyjo_root_state(num_players: int, seed: int) -> Any:
 
     def in_setup(s: Any) -> bool:
         legal = list(s.legal_actions())
-        return bool(legal) and all(
-            sk.decode(a).kind == sk.ActionKind.REVEAL_INITIAL for a in legal
-        )
+        return bool(legal) and all(sk.decode(a).kind == sk.ActionKind.REVEAL_INITIAL for a in legal)
 
     while not state.is_terminal and in_setup(state):
         state = state.apply_action(rng.choice(list(state.legal_actions())))
@@ -172,18 +170,18 @@ def _skyjo_root_state(num_players: int, seed: int) -> Any:
 def test_board_route_renders_odds_panel_with_threshold() -> None:
     store = InMemorySessionStore()
     agents: dict[int, Agent | None] = {0: None, 1: RandomAgent(random.Random(1))}
-    game_id = store.create(
-        GameSession(game="skyjo", state=_skyjo_root_state(2, 3), agents=agents)
-    )
+    game_id = store.create(GameSession(game="skyjo", state=_skyjo_root_state(2, 3), agents=agents))
     app.dependency_overrides[get_store] = lambda: store
     try:
         with TestClient(app) as c:
             r = c.get(f"/games/{game_id}/board?threshold=3")
             assert r.status_code == 200, r.text
-            assert "Avg unseen card" in r.text
-            # Prove the threshold was actually forwarded: the explorer input is
-            # seeded with it (3 -> 3.0) and the probability line is rendered.
-            assert 'value="3.0"' in r.text
-            assert "P(next card" in r.text
+            assert "Draw odds" in r.text
+            # Prove the threshold was forwarded: the explorer input is seeded with it
+            # (3, no trailing .0) and both probability lines render against that value.
+            assert 'value="3"' in r.text
+            assert "Chosen card value:" in r.text
+            assert "P(new card &lt; 3)" in r.text  # the beats-it line
+            assert "P(new card = 3)" in r.text  # the equal-value / column-clear line
     finally:
         app.dependency_overrides.pop(get_store, None)
