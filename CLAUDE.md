@@ -55,7 +55,9 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 
 ## Beads sync (project-specific)
 
-Beads sync rides on `git push`, but it takes **two** things: the installed `pre-push` git hook (`bd hooks install`, verify with `bd hooks list`) **and** `sync.auto-push: true` in `config.yaml`. The hook alone does nothing on push — `sync.auto-push` is what makes it run `bd dolt push`. With both in place, the Dolt remote stays in step with your code pushes; otherwise sync stays manual via `bd dolt push`.
+**The Dolt remote does not sync on `git push` by itself.** In bd 1.0.5 the `pre-push` hook (`bd hooks run pre-push`) does not call `bd dolt push`, and `sync.auto-push` is not consumed on that path (root cause in bead `table_peak-n5o`). The canonical beads sync is an explicit step — **`bd close` → `bd dolt push` → `git push`** ("Land the Plane").
+
+This repo wires that sync into the pre-push hook itself. Git runs `.beads/hooks/pre-push` (via `core.hooksPath`), and that tracked file carries a `bd dolt push` block **after** bd's managed `END BEADS INTEGRATION` marker — non-fatal, so a Dolt hiccup or the offline sandbox never blocks a code push. It's version-controlled and survives `bd hooks install`, so a single `git push` syncs both code and Beads with no separate install. To disable, delete that block (everything after the END marker).
 
 The `.beads/issues.jsonl` and `interactions.jsonl` exports are gitignored: they are passive, locally-regenerated snapshots (`export.auto: true`). The Dolt remote is the source of truth; do not commit the JSONL.
 

@@ -31,3 +31,17 @@ if command -v bd >/dev/null 2>&1; then
   if [ $_bd_exit -ne 0 ]; then exit $_bd_exit; fi
 fi
 # --- END BEADS INTEGRATION v1.0.5 ---
+
+# --- custom: sync Dolt remote on push (see bead table_peak-n5o) ---
+# bd's block above runs `bd hooks run pre-push`, which in bd 1.0.5 does NOT push
+# the Dolt remote. So we do it here, after bd's block. Non-fatal by design: a
+# Dolt/remote hiccup (or the offline agent sandbox) must never block a code push.
+if command -v bd >/dev/null 2>&1; then
+  echo "beads: syncing Dolt remote (bd dolt push)…" >&2
+  if bd dolt push; then
+    echo "beads: Dolt remote in sync." >&2
+  else
+    echo "beads: 'bd dolt push' failed (non-fatal) — run it manually when networked." >&2
+  fi
+fi
+# --- end custom ---
