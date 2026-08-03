@@ -22,8 +22,7 @@
       "Bash(rtk git:*)"
     ],
     "deny": [
-      "Edit(./Makefile)",
-      "Write(./Makefile)"
+      "Edit(./Makefile)"
     ]
   }
 }
